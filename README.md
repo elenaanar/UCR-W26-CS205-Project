@@ -112,24 +112,6 @@ src/
   ]
 }
 ```
-
----
-
-## Project Requirements
-
-### What You Must Do
-
-1. **Add new features** to the base app using AI coding agents
-2. **Present your work** to the class, including a live demo
-3. **Submit your code** with a summary of what you built and which AI tools you used
-
-### Rules
-
-- You **must** use at least one AI coding agent during development
-- You are free to use any combination of AI tools
-- All code should be functional - broken features will count against you
-- You may work individually or in groups (group size TBD by instructor)
-
 ---
 
 ## Feature Suggestions
