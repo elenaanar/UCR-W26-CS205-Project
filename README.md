@@ -13,7 +13,6 @@ Your job is to **leverage AI tools to plan, build, and ship new features** on to
 - [Getting Started](#getting-started)
 - [Base App Overview](#base-app-overview)
 - [Project Structure](#project-structure)
-- [Project Requirements](#project-requirements)
 - [Feature Suggestions](#feature-suggestions)
 - [Grading Rubric](#grading-rubric)
 - [AI Agent Shortcomings (Read This!)](#ai-agent-shortcomings-read-this)
