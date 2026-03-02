@@ -9,7 +9,7 @@ Your job is to **leverage AI tools to plan, build, and ship new features** on to
 ---
 
 ## Table of Contents
-
+- [Submission Guidelines](#submission-guidelines)
 - [Getting Started](#getting-started)
 - [Base App Overview](#base-app-overview)
 - [Project Structure](#project-structure)
@@ -17,7 +17,18 @@ Your job is to **leverage AI tools to plan, build, and ship new features** on to
 - [Grading Rubric](#grading-rubric)
 - [AI Agent Shortcomings (Read This!)](#ai-agent-shortcomings-read-this)
 - [AI Coding Agents (Free for Students)](#ai-coding-agents-free-for-students)
-- [Submission Guidelines](#submission-guidelines)
+
+
+---
+## Submission Guidelines
+
+1. **Code**: Push your final code to a GitHub repository and add [@Patchwork53](https://github.com/Patchwork53) as a collaborator
+2. **AI Usage Summary**: Include a brief section in your repo (e.g., `AI_USAGE.md`) describing:
+   - Which AI tools did you use?
+   - How they helped (planning, coding, debugging, etc.)
+   - Any limitations or issues you ran into
+3. **In-Person Presentation**: Prepare a short presentation with a live demo of your features.
+4. **Deadline**: See the course syllabus for the due date
 
 ---
 
@@ -257,17 +268,6 @@ A major part of this project is learning to use AI coding agents effectively. Th
 
 ---
 
-## Submission Guidelines
-
-1. **Code**: Push your final code to a GitHub repository and add [@Patchwork53](https://github.com/Patchwork53) as a collaborator
-2. **AI Usage Summary**: Include a brief section in your repo (e.g., `AI_USAGE.md`) describing:
-   - Which AI tools you used
-   - How they helped (planning, coding, debugging, etc.)
-   - Any limitations or issues you ran into
-3. **Presentation**: Prepare a short presentation with a live demo of your features
-4. **Deadline**: See the course syllabus for the due date
-
----
 
 ## License
 
