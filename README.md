@@ -200,7 +200,7 @@ AI agents tend to over-abstract and over-engineer. They'll create unnecessary he
 
 ### Excessive Defensive Programming
 
-Agents add try/catch blocks, null checks, fallback values, and error handling for scenarios that will never happen. They validate inputs that are already guaranteed by the framework. This clutters the code and makes it harder to read.
+Agents add try/catch blocks, null checks, fallback values, and error handling for scenarios that will never happen. They validate inputs that are already guaranteed by the framework. They hide errors by initializing variables with an empty list.
 
 **Your responsibility**: Only validate at system boundaries (user input, external APIs). Trust internal code and framework guarantees. Remove unnecessary error handling that obscures the actual logic.
 
