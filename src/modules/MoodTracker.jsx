@@ -10,12 +10,81 @@ const MOOD_LABELS = {
   5: 'Excellent',
 }
 
+const ACTIVITY_CATEGORIES = {
+  Social: [
+    'Friends',
+    'Family',
+    'Partner',
+    'Me Time',
+    'Classmates',
+    'Social Event',
+  ],
+  Hobbies: [
+    'Reading',
+    'Music',
+    'Writing',
+    'Gaming',
+    'Movies & TV',
+    'Art / Creative',
+    'Outdoors',
+    'Walking',
+    'Exercise / Gym',
+    'Sports',
+  ],
+  Responsibilities: [
+    'Work',
+    'Studying',
+    'Homework',
+    'Class',
+    'Shopping',
+    'Errands',
+    'Cleaning',
+    'Laundry',
+    'Cooking',
+    'Appointment',
+  ],
+  Wellness: [
+    'Good Sleep',
+    'Poor Sleep',
+    'Tired',
+    'Sick',
+    'Self Care',
+    'Stressed',
+    'Hydrated',
+    'Caffeine',
+  ],
+  Weather: [
+    'Sunny',
+    'Cloudy',
+    'Rainy',
+    'Windy',
+    'Stormy',
+    'Foggy',
+    'Hot',
+    'Cold',
+  ],
+}
+
 function MoodTracker() {
   const { moodEntries, addMoodEntry, deleteMoodEntry } = useHealthData()
   const [selectedMood, setSelectedMood] = useState(null)
+  const [selectedActivities, setSelectedActivities] = useState([])
 
   const handleSelectMood = (mood) => {
-    setSelectedMood(mood)
+    if (selectedMood === mood) {
+      setSelectedMood(null)
+      setSelectedActivities([])
+    } else {
+      setSelectedMood(mood)
+    }
+  }
+
+  const handleToggleActivity = (activity) => {
+    setSelectedActivities((prev) =>
+      prev.includes(activity)
+        ? prev.filter((item) => item !== activity)
+        : [...prev, activity]
+    )
   }
 
   const handleSubmit = () => {
@@ -26,6 +95,7 @@ function MoodTracker() {
     const newEntry = {
       id: Date.now(),
       mood: selectedMood,
+      activities: selectedActivities,
       timestamp: now.toISOString(),
       date: getTodayFormatted(),
       time: now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
@@ -33,6 +103,7 @@ function MoodTracker() {
 
     addMoodEntry(newEntry)
     setSelectedMood(null)
+    setSelectedActivities([])
   }
 
   const latestEntry = moodEntries.length > 0
@@ -53,17 +124,15 @@ function MoodTracker() {
           <button
             key={mood}
             onClick={() => handleSelectMood(mood)}
-            className={`flex-1 py-3 rounded-lg font-semibold border transition-colors ${
-              selectedMood === mood
-                ? 'bg-indigo-600 text-white border-indigo-600'
-                : 'bg-gray-50 text-gray-800 border-gray-300 hover:bg-gray-100'
-            }`}
+            className={`flex-1 py-3 rounded-lg font-semibold border transition-colors ${selectedMood === mood
+              ? 'bg-indigo-600 text-white border-indigo-600'
+              : 'bg-gray-50 text-gray-800 border-gray-300 hover:bg-gray-100'
+              }`}
           >
             <div className="text-lg">{mood}</div>
             <div
-              className={`text-xs mt-1 ${
-                selectedMood === mood ? 'text-white' : 'text-gray-600'
-              }`}
+              className={`text-xs mt-1 ${selectedMood === mood ? 'text-white' : 'text-gray-600'
+                }`}
             >
               {MOOD_LABELS[mood]}
             </div>
@@ -71,14 +140,55 @@ function MoodTracker() {
         ))}
       </div>
 
+      {selectedMood && (
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-3">
+            What did you do today?
+          </h3>
+          <p className="text-sm text-gray-600 mb-4">
+            Select any activities, conditions, or contexts connected to this mood.
+          </p>
+
+          <div className="space-y-4">
+            {Object.entries(ACTIVITY_CATEGORIES).map(([category, activities]) => (
+              <div key={category}>
+                <h4 className="text-sm font-medium text-gray-700 mb-2">
+                  {category}
+                </h4>
+
+                <div className="flex flex-wrap gap-2">
+                  {activities.map((activity) => {
+                    const isSelected = selectedActivities.includes(activity)
+
+                    return (
+                      <button
+                        key={activity}
+                        type="button"
+                        onClick={() => handleToggleActivity(activity)}
+                        className={`px-3 py-2 rounded-full text-sm font-medium border transition-colors ${isSelected
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100'
+                          }`}
+                      >
+                        {activity}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+
       <button
         onClick={handleSubmit}
         disabled={!selectedMood}
-        className={`w-full mb-6 py-2 px-4 rounded-lg font-medium transition-colors ${
-          selectedMood
-            ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-            : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-        }`}
+        className={`w-full mb-6 py-2 px-4 rounded-lg font-medium transition-colors ${selectedMood
+          ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+          : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+          }`}
       >
         Save how I feel
       </button>
@@ -92,6 +202,11 @@ function MoodTracker() {
           <p className="text-xs text-gray-500 mt-1">
             {latestEntry.date} at {latestEntry.time}
           </p>
+          {latestEntry.activities && latestEntry.activities.length > 0 && (
+            <p className="text-xs text-gray-500 mt-2">
+              Activities: {latestEntry.activities.join(', ')}
+            </p>
+          )}
         </div>
       )}
 
