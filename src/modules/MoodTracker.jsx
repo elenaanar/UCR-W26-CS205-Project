@@ -10,6 +10,14 @@ const MOOD_LABELS = {
   5: 'Excellent',
 }
 
+const MOOD_COLORS = {
+  1: '#f18a8b',
+  2: '#ffc58d',
+  3: '#ffffbf',
+  4: '#e5f88c',
+  5: '#b5f97c',
+}
+
 const ACTIVITY_CATEGORIES = {
   Social: [
     'Friends',
@@ -128,16 +136,23 @@ function MoodTracker() {
           <button
             key={mood}
             onClick={() => handleSelectMood(mood)}
-            className={`flex-1 py-3 rounded-lg font-semibold border transition-colors ${selectedMood === mood
-              ? 'bg-indigo-600 text-white border-indigo-600'
-              : 'bg-gray-50 text-gray-800 border-gray-300 hover:bg-gray-100'
-              }`}
+            className="flex-1 py-3 rounded-lg font-semibold border transition-colors"
+            style={
+              selectedMood === mood
+                ? {
+                  backgroundColor: MOOD_COLORS[mood],
+                  borderColor: MOOD_COLORS[mood],
+                  color: '#1a1a1a',
+                }
+                : {
+                  backgroundColor: '#f3f4f6',
+                  borderColor: '#d1d5db',
+                  color: '#1f2937',
+                }
+            }
           >
             <div className="text-lg">{mood}</div>
-            <div
-              className={`text-xs mt-1 ${selectedMood === mood ? 'text-white' : 'text-gray-600'
-                }`}
-            >
+            <div className="text-xs mt-1">
               {MOOD_LABELS[mood]}
             </div>
           </button>
