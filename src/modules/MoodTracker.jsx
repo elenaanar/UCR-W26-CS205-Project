@@ -69,11 +69,13 @@ function MoodTracker() {
   const { moodEntries, addMoodEntry, deleteMoodEntry } = useHealthData()
   const [selectedMood, setSelectedMood] = useState(null)
   const [selectedActivities, setSelectedActivities] = useState([])
+  const [notes, setNotes] = useState('')
 
   const handleSelectMood = (mood) => {
     if (selectedMood === mood) {
       setSelectedMood(null)
       setSelectedActivities([])
+      setNotes('')
     } else {
       setSelectedMood(mood)
     }
@@ -96,6 +98,7 @@ function MoodTracker() {
       id: Date.now(),
       mood: selectedMood,
       activities: selectedActivities,
+      notes: notes.trim(),
       timestamp: now.toISOString(),
       date: getTodayFormatted(),
       time: now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
@@ -104,6 +107,7 @@ function MoodTracker() {
     addMoodEntry(newEntry)
     setSelectedMood(null)
     setSelectedActivities([])
+    setNotes('')
   }
 
   const latestEntry = moodEntries.length > 0
@@ -178,6 +182,19 @@ function MoodTracker() {
               </div>
             ))}
           </div>
+
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Add a note (optional)
+            </label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Write a journal entry or note about how you're feeling..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+              rows="3"
+            />
+          </div>
         </div>
       )}
 
@@ -205,6 +222,11 @@ function MoodTracker() {
           {latestEntry.activities && latestEntry.activities.length > 0 && (
             <p className="text-xs text-gray-500 mt-2">
               Activities: {latestEntry.activities.join(', ')}
+            </p>
+          )}
+          {latestEntry.notes && (
+            <p className="text-xs text-gray-600 mt-2 italic">
+              Note: {latestEntry.notes.length > 100 ? latestEntry.notes.substring(0, 100) + '...' : latestEntry.notes}
             </p>
           )}
         </div>
