@@ -83,19 +83,31 @@ function HistoryView() {
                           </button>
                         </div>
                       </div>
-                      {expandedEntries[entry.id] && entry.activities && entry.activities.length > 0 && (
-                        <div className="mt-2 p-3 bg-white border-l-2 border-indigo-400 rounded-r-lg">
-                          <p className="text-sm text-gray-700 font-medium mb-2">Activities:</p>
-                          <div className="flex flex-wrap gap-2">
-                            {entry.activities.map((activity) => (
-                              <span
-                                key={activity}
-                                className="inline-block px-2 py-1 bg-indigo-100 text-indigo-700 text-xs rounded-full"
-                              >
-                                {activity}
-                              </span>
-                            ))}
-                          </div>
+                      {expandedEntries[entry.id] && (
+                        <div className="mt-2 space-y-2">
+                          {entry.activities && entry.activities.length > 0 && (
+                            <div className="p-3 bg-white border-l-2 border-indigo-400 rounded-r-lg">
+                              <p className="text-sm text-gray-700 font-medium mb-2">Activities:</p>
+                              <div className="flex flex-wrap gap-2">
+                                {entry.activities.map((activity) => (
+                                  <span
+                                    key={activity}
+                                    className="inline-block px-2 py-1 bg-indigo-100 text-indigo-700 text-xs rounded-full"
+                                  >
+                                    {activity}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {entry.notes && (
+                            <div className="p-3 bg-white border-l-2 border-amber-400 rounded-r-lg">
+                              <p className="text-sm text-gray-700 font-medium mb-2">Note:</p>
+                              <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                                {entry.notes}
+                              </p>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
