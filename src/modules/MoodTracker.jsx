@@ -78,6 +78,9 @@ function MoodTracker() {
   const [selectedMood, setSelectedMood] = useState(null)
   const [selectedActivities, setSelectedActivities] = useState([])
   const [notes, setNotes] = useState('')
+  // pastMode: null | 'menu' | 'yesterday' | 'picker'
+  const [pastMode, setPastMode] = useState(null)
+  const [pickerDate, setPickerDate] = useState('')
 
   const handleSelectMood = (mood) => {
     if (selectedMood === mood) {
@@ -116,7 +119,53 @@ function MoodTracker() {
     setSelectedMood(null)
     setSelectedActivities([])
     setNotes('')
+    setPastMode(null)
+    setPickerDate('')
   }
+
+  const handleSubmitForDate = (dateObj) => {
+    if (!selectedMood) return
+
+    const d = new Date(dateObj)
+    d.setHours(12, 0, 0, 0)
+
+    const newEntry = {
+      id: Date.now(),
+      mood: selectedMood,
+      activities: selectedActivities,
+      notes: notes.trim(),
+      timestamp: d.toISOString(),
+      date: d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' }),
+      time: '12:00 PM',
+    }
+
+    addMoodEntry(newEntry)
+    setSelectedMood(null)
+    setSelectedActivities([])
+    setNotes('')
+    setPastMode(null)
+    setPickerDate('')
+  }
+
+  const resetPastMode = () => {
+    setPastMode(null)
+    setPickerDate('')
+  }
+
+  const todayStr = new Date().toISOString().split('T')[0]
+
+  const yesterdayObj = (() => {
+    const d = new Date()
+    d.setDate(d.getDate() - 1)
+    return d
+  })()
+
+  const pickerDateFormatted = (() => {
+    if (!pickerDate) return null
+    const [year, month, day] = pickerDate.split('-').map(Number)
+    const d = new Date(year, month - 1, day)
+    return d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })
+  })()
 
   const latestEntry = moodEntries.length > 0
     ? [...moodEntries].sort((a, b) => b.id - a.id)[0]
@@ -214,16 +263,91 @@ function MoodTracker() {
       )}
 
 
-      <button
-        onClick={handleSubmit}
-        disabled={!selectedMood}
-        className={`w-full mb-6 py-2 px-4 rounded-lg font-medium transition-colors ${selectedMood
-          ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-          : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+      {/* Past-date panel */}
+      {pastMode !== null && (
+        <div className="mb-2 px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-lg">
+          {pastMode === 'menu' && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPastMode('yesterday')}
+                className="flex-1 py-1.5 px-3 text-sm font-medium rounded-md bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition-colors"
+              >
+                Yesterday
+              </button>
+              <button
+                onClick={() => setPastMode('picker')}
+                className="flex-1 py-1.5 px-3 text-sm font-medium rounded-md bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition-colors"
+              >
+                Another day…
+              </button>
+            </div>
+          )}
+          {pastMode === 'yesterday' && (
+            <p className="text-sm text-indigo-700 font-medium">
+              Saving for yesterday ({yesterdayObj.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })}) at 12:00 PM
+            </p>
+          )}
+          {pastMode === 'picker' && (
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-indigo-700 font-medium whitespace-nowrap">Pick a date:</label>
+              <input
+                type="date"
+                max={todayStr}
+                value={pickerDate}
+                onChange={(e) => setPickerDate(e.target.value)}
+                className="flex-1 text-sm border border-indigo-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              />
+              {pickerDate && (
+                <span className="text-sm text-indigo-600 whitespace-nowrap">at 12:00 PM</span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="flex mb-6 gap-0">
+        <button
+          onClick={() => pastMode !== null ? resetPastMode() : setPastMode('menu')}
+          disabled={!selectedMood}
+          title={pastMode !== null ? 'Cancel' : 'Save for a past day instead'}
+          className={`flex items-center justify-center w-9 rounded-l-lg font-medium transition-colors border-r border-white/20 ${
+            selectedMood
+              ? pastMode !== null
+                ? 'bg-indigo-400 text-white hover:bg-indigo-500'
+                : 'bg-indigo-600 text-white hover:bg-indigo-700'
+              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
           }`}
-      >
-        Save how I feel
-      </button>
+        >
+          {pastMode !== null ? '✕' : '◀'}
+        </button>
+        <button
+          onClick={() => {
+            if (pastMode === 'yesterday') handleSubmitForDate(yesterdayObj)
+            else if (pastMode === 'picker' && pickerDate) {
+              const [y, m, d] = pickerDate.split('-').map(Number)
+              handleSubmitForDate(new Date(y, m - 1, d))
+            } else if (pastMode === null) handleSubmit()
+          }}
+          disabled={
+            !selectedMood ||
+            (pastMode === 'picker' && !pickerDate) ||
+            pastMode === 'menu'
+          }
+          className={`flex-1 py-2 px-4 rounded-r-lg font-medium transition-colors ${
+            selectedMood && pastMode !== 'menu' && !(pastMode === 'picker' && !pickerDate)
+              ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+              : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+          }`}
+        >
+          {pastMode === 'yesterday'
+            ? 'Confirm for yesterday'
+            : pastMode === 'picker' && pickerDateFormatted
+            ? `Confirm for ${pickerDateFormatted}`
+            : pastMode === 'menu'
+            ? 'Select a day above'
+            : 'Save how I feel'}
+        </button>
+      </div>
 
       {latestEntry && (
         <div className="mb-6 p-4 bg-indigo-50 rounded-lg">
