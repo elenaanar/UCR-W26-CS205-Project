@@ -89,14 +89,17 @@ function HistoryView() {
                             <div className="p-3 bg-white border-l-2 border-indigo-400 rounded-r-lg">
                               <p className="text-sm text-gray-700 font-medium mb-2">Activities:</p>
                               <div className="flex flex-wrap gap-2">
-                                {entry.activities.map((activity) => (
-                                  <span
-                                    key={activity}
-                                    className="inline-block px-2 py-1 bg-indigo-100 text-indigo-700 text-xs rounded-full"
-                                  >
-                                    {activity}
-                                  </span>
-                                ))}
+                                {entry.activities.map((activity) => {
+                                  const name = typeof activity === 'string' ? activity : activity.name
+                                  return (
+                                    <span
+                                      key={name}
+                                      className="inline-block px-2 py-1 bg-indigo-100 text-indigo-700 text-xs rounded-full"
+                                    >
+                                      {name}
+                                    </span>
+                                  )
+                                })}
                               </div>
                             </div>
                           )}
