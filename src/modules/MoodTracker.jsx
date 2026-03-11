@@ -270,7 +270,7 @@ function MoodTracker() {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Write a journal entry or note about how you're feeling..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 focus:border-transparent resize-none"
               rows="3"
             />
           </div>
