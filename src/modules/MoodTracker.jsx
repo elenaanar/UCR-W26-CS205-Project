@@ -94,11 +94,11 @@ function MoodTracker() {
     }
   }
 
-  const handleToggleActivity = (activity) => {
+  const handleToggleActivity = (activity, category) => {
     setSelectedActivities((prev) =>
-      prev.includes(activity)
-        ? prev.filter((item) => item !== activity)
-        : [...prev, activity]
+      prev.some((a) => a.name === activity)
+        ? prev.filter((a) => a.name !== activity)
+        : [...prev, { name: activity, category }]
     )
   }
 
@@ -241,13 +241,13 @@ function MoodTracker() {
 
                 <div className="flex flex-wrap gap-2">
                   {activities.map((activity) => {
-                    const isSelected = selectedActivities.includes(activity)
+                    const isSelected = selectedActivities.some((a) => a.name === activity)
 
                     return (
                       <button
                         key={activity}
                         type="button"
-                        onClick={() => handleToggleActivity(activity)}
+                        onClick={() => handleToggleActivity(activity, category)}
                         className={`px-3 py-2 rounded-full text-sm font-medium border transition-colors ${isSelected
                           ? 'bg-indigo-600 text-white border-indigo-600'
                           : 'bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100'
@@ -395,7 +395,7 @@ function MoodTracker() {
           </p>
           {latestEntry.activities && latestEntry.activities.length > 0 && (
             <p className="text-xs text-gray-500 mt-2">
-              Activities: {latestEntry.activities.join(', ')}
+              Activities: {latestEntry.activities.map((a) => typeof a === 'string' ? a : a.name).join(', ')}
             </p>
           )}
           {latestEntry.notes && (
