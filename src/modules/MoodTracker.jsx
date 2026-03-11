@@ -263,32 +263,39 @@ function MoodTracker() {
       )}
 
 
-      {/* Past-date panel */}
-      {pastMode !== null && (
-        <div className="mb-2 px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-lg">
-          {pastMode === 'menu' && (
-            <div className="flex gap-2">
-              <button
-                onClick={() => setPastMode('yesterday')}
-                className="flex-1 py-1.5 px-3 text-sm font-medium rounded-md bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition-colors"
-              >
-                Yesterday
-              </button>
-              <button
-                onClick={() => setPastMode('picker')}
-                className="flex-1 py-1.5 px-3 text-sm font-medium rounded-md bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition-colors"
-              >
-                Another day…
-              </button>
+      {/* Past-date panel — always in DOM so transitions work in both directions */}
+      <div
+        className={`overflow-hidden transition-all duration-300 ease-in-out ${
+          pastMode !== null
+            ? 'max-h-16 opacity-100 mb-2'
+            : 'max-h-0 opacity-0 pointer-events-none'
+        }`}
+      >
+        <div className="px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-lg">
+          {/* All three states share the same space; inactive ones are absolute so no layout shift */}
+          <div className="relative h-8">
+            <div className={`absolute inset-0 flex items-center transition-opacity duration-200 ${pastMode === 'menu' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+              <div className="flex gap-2 w-full">
+                <button
+                  onClick={() => setPastMode('yesterday')}
+                  className="flex-1 py-1 px-3 text-sm font-medium rounded-md bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition-colors"
+                >
+                  Yesterday
+                </button>
+                <button
+                  onClick={() => setPastMode('picker')}
+                  className="flex-1 py-1 px-3 text-sm font-medium rounded-md bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition-colors"
+                >
+                  Another day…
+                </button>
+              </div>
             </div>
-          )}
-          {pastMode === 'yesterday' && (
-            <p className="text-sm text-indigo-700 font-medium">
-              Saving for yesterday ({yesterdayObj.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })}) at 12:00 PM
-            </p>
-          )}
-          {pastMode === 'picker' && (
-            <div className="flex items-center gap-2">
+            <div className={`absolute inset-0 flex items-center transition-opacity duration-200 ${pastMode === 'yesterday' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+              <p className="text-sm text-indigo-700 font-medium">
+                Saving for yesterday ({yesterdayObj.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })}) at 12:00 PM
+              </p>
+            </div>
+            <div className={`absolute inset-0 flex items-center gap-2 transition-opacity duration-200 ${pastMode === 'picker' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
               <label className="text-sm text-indigo-700 font-medium whitespace-nowrap">Pick a date:</label>
               <input
                 type="date"
@@ -301,9 +308,9 @@ function MoodTracker() {
                 <span className="text-sm text-indigo-600 whitespace-nowrap">at 12:00 PM</span>
               )}
             </div>
-          )}
+          </div>
         </div>
-      )}
+      </div>
 
       <div className="flex mb-6 gap-0">
         <button
