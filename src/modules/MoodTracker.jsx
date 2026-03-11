@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useHealthData } from '../context/HealthDataContext'
 import { getTodayFormatted } from '../utils/helpers'
 
@@ -81,6 +81,8 @@ function MoodTracker() {
   // pastMode: null | 'menu' | 'yesterday' | 'picker'
   const [pastMode, setPastMode] = useState(null)
   const [pickerDate, setPickerDate] = useState('')
+  const [pickerTime, setPickerTime] = useState('12:00')
+  const dateInputRef = useRef(null)
 
   const handleSelectMood = (mood) => {
     if (selectedMood === mood) {
@@ -126,8 +128,13 @@ function MoodTracker() {
   const handleSubmitForDate = (dateObj) => {
     if (!selectedMood) return
 
+    const [hours, minutes] = pickerTime.split(':').map(Number)
     const d = new Date(dateObj)
-    d.setHours(12, 0, 0, 0)
+    d.setHours(hours, minutes, 0, 0)
+
+    const ampm = hours >= 12 ? 'PM' : 'AM'
+    const h12 = hours % 12 || 12
+    const timeStr = `${h12}:${String(minutes).padStart(2, '0')} ${ampm}`
 
     const newEntry = {
       id: Date.now(),
@@ -136,7 +143,7 @@ function MoodTracker() {
       notes: notes.trim(),
       timestamp: d.toISOString(),
       date: d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' }),
-      time: '12:00 PM',
+      time: timeStr,
     }
 
     addMoodEntry(newEntry)
@@ -145,11 +152,13 @@ function MoodTracker() {
     setNotes('')
     setPastMode(null)
     setPickerDate('')
+    setPickerTime('12:00')
   }
 
   const resetPastMode = () => {
     setPastMode(null)
     setPickerDate('')
+    setPickerTime('12:00')
   }
 
   const todayStr = new Date().toISOString().split('T')[0]
@@ -289,30 +298,43 @@ function MoodTracker() {
                   Yesterday
                 </button>
                 <button
-                  onClick={() => setPastMode('picker')}
+                  onClick={() => {
+                    setPastMode('picker')
+                    setTimeout(() => dateInputRef.current?.showPicker(), 50)
+                  }}
                   className="flex-1 py-1 px-3 text-sm font-medium rounded-md bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition-colors"
                 >
                   Another day…
                 </button>
               </div>
             </div>
-            <div className={`absolute inset-0 flex items-center transition-opacity duration-200 ${pastMode === 'yesterday' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-              <p className="text-sm text-indigo-700 font-medium">
-                Saving for yesterday ({yesterdayObj.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })}) at 12:00 PM
-              </p>
+            <div className={`absolute inset-0 flex items-center gap-2 transition-opacity duration-200 ${pastMode === 'yesterday' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+              <span className="text-sm text-indigo-700 font-medium whitespace-nowrap">
+                Yesterday ({yesterdayObj.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })}) at
+              </span>
+              <input
+                type="time"
+                value={pickerTime}
+                onChange={(e) => setPickerTime(e.target.value)}
+                className="text-sm border border-indigo-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              />
             </div>
             <div className={`absolute inset-0 flex items-center gap-2 transition-opacity duration-200 ${pastMode === 'picker' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-              <label className="text-sm text-indigo-700 font-medium whitespace-nowrap">Pick a date:</label>
               <input
                 type="date"
+                ref={dateInputRef}
                 max={todayStr}
                 value={pickerDate}
                 onChange={(e) => setPickerDate(e.target.value)}
                 className="flex-1 text-sm border border-indigo-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-400"
               />
-              {pickerDate && (
-                <span className="text-sm text-indigo-600 whitespace-nowrap">at 12:00 PM</span>
-              )}
+              <span className="text-sm text-indigo-700 whitespace-nowrap">at</span>
+              <input
+                type="time"
+                value={pickerTime}
+                onChange={(e) => setPickerTime(e.target.value)}
+                className="text-sm border border-indigo-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              />
             </div>
           </div>
         </div>
