@@ -208,8 +208,14 @@ function MoodTracker() {
         ))}
       </div>
 
-      {selectedMood && (
-        <div className="mb-6">
+      <div
+        className={`overflow-hidden transition-all duration-500 ease-in-out ${
+          selectedMood
+            ? 'max-h-[900px] opacity-100 mb-6'
+            : 'max-h-0 opacity-0 pointer-events-none'
+        }`}
+      >
+        <div>
           <h3 className="text-lg font-semibold text-gray-800 mb-3">
             What did you do today?
           </h3>
@@ -260,7 +266,7 @@ function MoodTracker() {
             />
           </div>
         </div>
-      )}
+      </div>
 
 
       {/* Past-date panel — always in DOM so transitions work in both directions */}
