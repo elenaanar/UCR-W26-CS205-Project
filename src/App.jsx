@@ -5,6 +5,7 @@ import DailyGraph from './components/DailyGraph'
 import WeeklyGraph from './components/WeeklyGraph'
 import HistoryView from './components/HistoryView'
 import FileManager from './components/FileManager'
+import StreakCard from './components/StreakCard'
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -63,6 +64,7 @@ function App() {
                 <MoodTracker />
                 <DailyGraph />
                 <WeeklyGraph />
+                <StreakCard />
               </div>
             </div>
           )}

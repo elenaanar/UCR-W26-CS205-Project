@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useHealthData } from '../context/HealthDataContext'
 import { getTodayFormatted } from '../utils/helpers'
 
@@ -78,6 +78,11 @@ function MoodTracker() {
   const [selectedMood, setSelectedMood] = useState(null)
   const [selectedActivities, setSelectedActivities] = useState([])
   const [notes, setNotes] = useState('')
+  // pastMode: null | 'menu' | 'yesterday' | 'picker'
+  const [pastMode, setPastMode] = useState(null)
+  const [pickerDate, setPickerDate] = useState('')
+  const [pickerTime, setPickerTime] = useState('12:00')
+  const dateInputRef = useRef(null)
 
   const handleSelectMood = (mood) => {
     if (selectedMood === mood) {
@@ -116,7 +121,60 @@ function MoodTracker() {
     setSelectedMood(null)
     setSelectedActivities([])
     setNotes('')
+    setPastMode(null)
+    setPickerDate('')
   }
+
+  const handleSubmitForDate = (dateObj) => {
+    if (!selectedMood) return
+
+    const [hours, minutes] = pickerTime.split(':').map(Number)
+    const d = new Date(dateObj)
+    d.setHours(hours, minutes, 0, 0)
+
+    const ampm = hours >= 12 ? 'PM' : 'AM'
+    const h12 = hours % 12 || 12
+    const timeStr = `${h12}:${String(minutes).padStart(2, '0')} ${ampm}`
+
+    const newEntry = {
+      id: Date.now(),
+      mood: selectedMood,
+      activities: selectedActivities,
+      notes: notes.trim(),
+      timestamp: d.toISOString(),
+      date: d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' }),
+      time: timeStr,
+    }
+
+    addMoodEntry(newEntry)
+    setSelectedMood(null)
+    setSelectedActivities([])
+    setNotes('')
+    setPastMode(null)
+    setPickerDate('')
+    setPickerTime('12:00')
+  }
+
+  const resetPastMode = () => {
+    setPastMode(null)
+    setPickerDate('')
+    setPickerTime('12:00')
+  }
+
+  const todayStr = new Date().toISOString().split('T')[0]
+
+  const yesterdayObj = (() => {
+    const d = new Date()
+    d.setDate(d.getDate() - 1)
+    return d
+  })()
+
+  const pickerDateFormatted = (() => {
+    if (!pickerDate) return null
+    const [year, month, day] = pickerDate.split('-').map(Number)
+    const d = new Date(year, month - 1, day)
+    return d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })
+  })()
 
   const latestEntry = moodEntries.length > 0
     ? [...moodEntries].sort((a, b) => b.id - a.id)[0]
@@ -159,8 +217,14 @@ function MoodTracker() {
         ))}
       </div>
 
-      {selectedMood && (
-        <div className="mb-6">
+      <div
+        className={`overflow-hidden transition-all duration-500 ease-in-out ${
+          selectedMood
+            ? 'max-h-[900px] opacity-100 mb-6'
+            : 'max-h-0 opacity-0 pointer-events-none'
+        }`}
+      >
+        <div>
           <h3 className="text-lg font-semibold text-gray-800 mb-3">
             What did you do today?
           </h3>
@@ -211,19 +275,114 @@ function MoodTracker() {
             />
           </div>
         </div>
-      )}
+      </div>
 
 
-      <button
-        onClick={handleSubmit}
-        disabled={!selectedMood}
-        className={`w-full mb-6 py-2 px-4 rounded-lg font-medium transition-colors ${selectedMood
-          ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-          : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-          }`}
+      {/* Past-date panel — always in DOM so transitions work in both directions */}
+      <div
+        className={`overflow-hidden transition-all duration-300 ease-in-out ${
+          pastMode !== null
+            ? 'max-h-16 opacity-100 mb-2'
+            : 'max-h-0 opacity-0 pointer-events-none'
+        }`}
       >
-        Save how I feel
-      </button>
+        <div className="px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-lg">
+          {/* All three states share the same space; inactive ones are absolute so no layout shift */}
+          <div className="relative h-8">
+            <div className={`absolute inset-0 flex items-center transition-opacity duration-200 ${pastMode === 'menu' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+              <div className="flex gap-2 w-full">
+                <button
+                  onClick={() => setPastMode('yesterday')}
+                  className="flex-1 py-1 px-3 text-sm font-medium rounded-md bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition-colors"
+                >
+                  Yesterday
+                </button>
+                <button
+                  onClick={() => {
+                    setPastMode('picker')
+                    setTimeout(() => dateInputRef.current?.showPicker(), 50)
+                  }}
+                  className="flex-1 py-1 px-3 text-sm font-medium rounded-md bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition-colors"
+                >
+                  Another day…
+                </button>
+              </div>
+            </div>
+            <div className={`absolute inset-0 flex items-center gap-2 transition-opacity duration-200 ${pastMode === 'yesterday' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+              <span className="text-sm text-indigo-700 font-medium whitespace-nowrap">
+                Yesterday ({yesterdayObj.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })}) at
+              </span>
+              <input
+                type="time"
+                value={pickerTime}
+                onChange={(e) => setPickerTime(e.target.value)}
+                className="text-sm border border-indigo-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              />
+            </div>
+            <div className={`absolute inset-0 flex items-center gap-2 transition-opacity duration-200 ${pastMode === 'picker' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+              <input
+                type="date"
+                ref={dateInputRef}
+                max={todayStr}
+                value={pickerDate}
+                onChange={(e) => setPickerDate(e.target.value)}
+                className="flex-1 text-sm border border-indigo-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              />
+              <span className="text-sm text-indigo-700 whitespace-nowrap">at</span>
+              <input
+                type="time"
+                value={pickerTime}
+                onChange={(e) => setPickerTime(e.target.value)}
+                className="text-sm border border-indigo-200 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex mb-6 gap-0">
+        <button
+          onClick={() => pastMode !== null ? resetPastMode() : setPastMode('menu')}
+          disabled={!selectedMood}
+          title={pastMode !== null ? 'Cancel' : 'Save for a past day instead'}
+          className={`flex items-center justify-center w-9 rounded-l-lg font-medium transition-colors border-r border-white/20 ${
+            selectedMood
+              ? pastMode !== null
+                ? 'bg-indigo-400 text-white hover:bg-indigo-500'
+                : 'bg-indigo-600 text-white hover:bg-indigo-700'
+              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+          }`}
+        >
+          {pastMode !== null ? '✕' : '◀'}
+        </button>
+        <button
+          onClick={() => {
+            if (pastMode === 'yesterday') handleSubmitForDate(yesterdayObj)
+            else if (pastMode === 'picker' && pickerDate) {
+              const [y, m, d] = pickerDate.split('-').map(Number)
+              handleSubmitForDate(new Date(y, m - 1, d))
+            } else if (pastMode === null) handleSubmit()
+          }}
+          disabled={
+            !selectedMood ||
+            (pastMode === 'picker' && !pickerDate) ||
+            pastMode === 'menu'
+          }
+          className={`flex-1 py-2 px-4 rounded-r-lg font-medium transition-colors ${
+            selectedMood && pastMode !== 'menu' && !(pastMode === 'picker' && !pickerDate)
+              ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+              : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+          }`}
+        >
+          {pastMode === 'yesterday'
+            ? 'Confirm for yesterday'
+            : pastMode === 'picker' && pickerDateFormatted
+            ? `Confirm for ${pickerDateFormatted}`
+            : pastMode === 'menu'
+            ? 'Select a day above'
+            : 'Save how I feel'}
+        </button>
+      </div>
 
       {latestEntry && (
         <div className="mb-6 p-4 bg-indigo-50 rounded-lg">
