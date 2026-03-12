@@ -60,11 +60,15 @@ function App() {
 
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <MoodTracker />
-                <DailyGraph />
-                <WeeklyGraph />
-                <StreakCard />
+              <div className="flex flex-col lg:flex-row gap-6">
+                <div className="flex flex-col gap-6 lg:w-1/2">
+                  <MoodTracker />
+                  <WeeklyGraph />
+                </div>
+                <div className="flex flex-col gap-6 lg:w-1/2">
+                  <DailyGraph />
+                  <StreakCard />
+                </div>
               </div>
             </div>
           )}
