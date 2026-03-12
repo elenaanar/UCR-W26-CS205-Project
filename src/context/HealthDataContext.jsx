@@ -148,6 +148,14 @@ export function HealthDataProvider({ children }) {
     }))
   }
 
+  const deleteActivityWithHistory = (name) => {
+    deleteActivity(name)
+    setMoodEntries(prev => prev.map(entry => ({
+      ...entry,
+      activities: (entry.activities || []).filter(a => (typeof a === 'string' ? a : a.name) !== name),
+    })))
+  }
+
   const setAllData = (moodEntries) => {
     setMoodEntries(moodEntries)
   }
@@ -191,6 +199,7 @@ export function HealthDataProvider({ children }) {
         customActivities,
         addCustomActivity,
         deleteActivity,
+        deleteActivityWithHistory,
       }}
     >
       {children}

@@ -33,7 +33,7 @@ function findCategory(activityName) {
 }
 
 function MoodTracker() {
-  const { moodEntries, addMoodEntry, deleteMoodEntry, updateMoodEntry, customActivities, addCustomActivity } = useHealthData()
+  const { moodEntries, addMoodEntry, deleteMoodEntry, updateMoodEntry, customActivities, addCustomActivity, deleteActivity, deleteActivityWithHistory } = useHealthData()
   const [selectedMood, setSelectedMood] = useState(null)
   const [selectedActivities, setSelectedActivities] = useState([])
   const [notes, setNotes] = useState('')
@@ -48,6 +48,7 @@ function MoodTracker() {
   const [newActivityCategory, setNewActivityCategory] = useState('')
   const [newCategoryName, setNewCategoryName] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState(null) // activity name pending confirmation
+  const [historyChoice, setHistoryChoice] = useState(null) // activity name pending history popup
   const dateInputRef = useRef(null)
 
   const allCategories = useMemo(() => {
@@ -357,6 +358,7 @@ function MoodTracker() {
                         setNewActivityName('')
                         setNewActivityCategory('')
                         setNewCategoryName('')
+                        setEditMode(null)
                       }}
                       className="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
                     >
@@ -371,12 +373,12 @@ function MoodTracker() {
                     {deleteConfirm ? (
                       <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                         <p className="text-sm text-red-700 mb-2">
-                          Remove <span className="font-semibold">"{deleteConfirm}"</span>? Your history will still be saved.
+                          Remove <span className="font-semibold">"{deleteConfirm}"</span> from the activity picker?
                         </p>
                         <div className="flex gap-2">
                           <button
                             type="button"
-                            onClick={() => { deleteActivity(deleteConfirm); setDeleteConfirm(null) }}
+                            onClick={() => { setHistoryChoice(deleteConfirm); setDeleteConfirm(null) }}
                             className="px-3 py-1 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
                           >
                             Yes, remove it
@@ -550,6 +552,48 @@ function MoodTracker() {
             : 'Save how I feel'}
         </button>
       </div>
+
+      {/* History choice modal */}
+      {historyChoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl p-6 mx-4 max-w-sm w-full space-y-4">
+            <h3 className="text-base font-semibold text-gray-800">
+              Keep history for "{historyChoice}"?
+            </h3>
+            <p className="text-sm text-gray-500">
+              Past entries that included this activity will still show it in your history.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => { deleteActivity(historyChoice); setHistoryChoice(null); setEditMode(null) }}
+                className="w-full py-2 px-4 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                Keep history (recommended)
+              </button>
+              <button
+                type="button"
+                onClick={() => setHistoryChoice(null)}
+                className="w-full py-2 px-4 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+            <div className="border-t border-gray-200 pt-3 space-y-2">
+              <p className="text-xs text-gray-400">
+                ⚠️ <span className="font-semibold text-gray-600">This cannot be undone.</span> Erasing history will permanently remove this activity from all past entries.
+              </p>
+              <button
+                type="button"
+                onClick={() => { deleteActivityWithHistory(historyChoice); setHistoryChoice(null); setEditMode(null) }}
+                className="w-full py-1.5 px-4 text-xs text-gray-400 border border-gray-200 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-300 transition-colors"
+              >
+                Erase from history too
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-2 max-h-64 overflow-y-auto">
         {moodEntries.length === 0 ? (
