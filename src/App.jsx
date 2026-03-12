@@ -10,7 +10,6 @@ import FileManager from './components/FileManager'
 import StreakCard from './components/StreakCard'
 import AnalyticsView from './components/AnalyticsView'
 
-<<<<<<< HEAD
 function AuthWidget() {
   const { user, signInWithGoogle, logout } = useAuth()
 
@@ -68,12 +67,6 @@ function AuthWidget() {
 }
 
 function AppContent() {
-=======
-import { signInWithPopup, signOut } from 'firebase/auth'
-import { auth, googleProvider } from './firebase/firebaseConfig'
-
-function App() {
->>>>>>> 28a2981 (added firebase setup and google auth)
   const [activeTab, setActiveTab] = useState('dashboard')
 
   const handleGoogleLogin = async () => {
