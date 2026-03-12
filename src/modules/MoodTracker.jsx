@@ -43,10 +43,11 @@ function MoodTracker() {
   const [pickerTime, setPickerTime] = useState('12:00')
   const [editingEntry, setEditingEntry] = useState(null)
   const [expandedEntryId, setExpandedEntryId] = useState(null)
-  const [showAddForm, setShowAddForm] = useState(false)
+  const [editMode, setEditMode] = useState(null) // null | 'add' | 'delete'
   const [newActivityName, setNewActivityName] = useState('')
   const [newActivityCategory, setNewActivityCategory] = useState('')
   const [newCategoryName, setNewCategoryName] = useState('')
+  const [deleteConfirm, setDeleteConfirm] = useState(null) // activity name pending confirmation
   const dateInputRef = useRef(null)
 
   const allCategories = useMemo(() => {
@@ -256,7 +257,7 @@ function MoodTracker() {
       <div
         className={`overflow-hidden transition-all duration-500 ease-in-out ${
           selectedMood
-            ? 'max-h-[900px] opacity-100 mb-6'
+            ? 'max-h-[1600px] opacity-100 mb-6'
             : 'max-h-0 opacity-0 pointer-events-none'
         }`}
       >
@@ -294,72 +295,131 @@ function MoodTracker() {
             ))}
           </div>
 
-          {/* Add custom activity */}
+          {/* Edit activities panel */}
           <div className="mt-4">
-            <div
-              className={`overflow-hidden transition-all duration-300 ${showAddForm ? 'max-h-40 opacity-100 mb-3' : 'max-h-0 opacity-0'}`}
-            >
-              <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
-                <input
-                  type="text"
-                  value={newActivityName}
-                  onChange={(e) => setNewActivityName(e.target.value)}
-                  placeholder="Activity name"
-                  className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
-                />
-                <div className="flex gap-2">
-                  <select
-                    value={newActivityCategory}
-                    onChange={(e) => { setNewActivityCategory(e.target.value); setNewCategoryName('') }}
-                    className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 bg-white"
+            <div className={`overflow-hidden transition-all duration-300 ${editMode ? 'max-h-96 opacity-100 mb-3' : 'max-h-0 opacity-0'}`}>
+              <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                {/* Tabs */}
+                <div className="flex gap-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => { setEditMode('add'); setDeleteConfirm(null) }}
+                    className={`px-3 py-1 text-sm rounded-full border transition-colors ${editMode === 'add' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-300 hover:border-indigo-400'}`}
                   >
-                    <option value="">Select category…</option>
-                    {allCategoryNames.map(c => <option key={c} value={c}>{c}</option>)}
-                    <option value="__new__">New category…</option>
-                  </select>
-                  {newActivityCategory === '__new__' && (
+                    Add activity
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setEditMode('delete'); setNewActivityName(''); setNewActivityCategory(''); setNewCategoryName('') }}
+                    className={`px-3 py-1 text-sm rounded-full border transition-colors ${editMode === 'delete' ? 'bg-red-500 text-white border-red-500' : 'bg-white text-gray-600 border-gray-300 hover:border-red-400'}`}
+                  >
+                    Remove activity
+                  </button>
+                </div>
+
+                {/* Add form */}
+                {editMode === 'add' && (
+                  <div className="space-y-2">
                     <input
                       type="text"
-                      value={newCategoryName}
-                      onChange={(e) => setNewCategoryName(e.target.value)}
-                      placeholder="Category name"
-                      className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
+                      value={newActivityName}
+                      onChange={(e) => setNewActivityName(e.target.value)}
+                      placeholder="Activity name"
+                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
                     />
-                  )}
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const name = newActivityName.trim()
-                      const category = newActivityCategory === '__new__' ? newCategoryName.trim() : newActivityCategory
-                      if (!name || !category) return
-                      addCustomActivity(name, category)
-                      setNewActivityName('')
-                      setNewActivityCategory('')
-                      setNewCategoryName('')
-                      setShowAddForm(false)
-                    }}
-                    className="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                  >
-                    Add
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setShowAddForm(false); setNewActivityName(''); setNewActivityCategory(''); setNewCategoryName('') }}
-                    className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
+                    <div className="flex gap-2">
+                      <select
+                        value={newActivityCategory}
+                        onChange={(e) => { setNewActivityCategory(e.target.value); setNewCategoryName('') }}
+                        className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 bg-white"
+                      >
+                        <option value="">Select category…</option>
+                        {allCategoryNames.map(c => <option key={c} value={c}>{c}</option>)}
+                        <option value="__new__">New category…</option>
+                      </select>
+                      {newActivityCategory === '__new__' && (
+                        <input
+                          type="text"
+                          value={newCategoryName}
+                          onChange={(e) => setNewCategoryName(e.target.value)}
+                          placeholder="Category name"
+                          className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
+                        />
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const name = newActivityName.trim()
+                        const category = newActivityCategory === '__new__' ? newCategoryName.trim() : newActivityCategory
+                        if (!name || !category) return
+                        addCustomActivity(name, category)
+                        setNewActivityName('')
+                        setNewActivityCategory('')
+                        setNewCategoryName('')
+                      }}
+                      className="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                    >
+                      Add
+                    </button>
+                  </div>
+                )}
+
+                {/* Delete list */}
+                {editMode === 'delete' && (
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {deleteConfirm ? (
+                      <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <p className="text-sm text-red-700 mb-2">
+                          Remove <span className="font-semibold">"{deleteConfirm}"</span>? Your history will still be saved.
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => { deleteActivity(deleteConfirm); setDeleteConfirm(null) }}
+                            className="px-3 py-1 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                          >
+                            Yes, remove it
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteConfirm(null)}
+                            className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      Object.entries(allCategories).map(([category, activities]) => (
+                        <div key={category}>
+                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">{category}</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {activities.map(activity => (
+                              <button
+                                key={activity}
+                                type="button"
+                                onClick={() => setDeleteConfirm(activity)}
+                                className="px-2.5 py-1 text-sm bg-white border border-gray-300 rounded-full text-gray-700 hover:border-red-400 hover:text-red-600 transition-colors"
+                              >
+                                {activity}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
             </div>
+
             <button
               type="button"
-              onClick={() => setShowAddForm(v => !v)}
+              onClick={() => { setEditMode(v => v ? null : 'add'); setDeleteConfirm(null); setNewActivityName(''); setNewActivityCategory(''); setNewCategoryName('') }}
               className="text-sm text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
             >
-              {showAddForm ? '− Cancel' : '+ Add activity'}
+              {editMode ? '− Close' : '✎ Edit activities'}
             </button>
           </div>
 
