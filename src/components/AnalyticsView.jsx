@@ -43,8 +43,8 @@ function AnalyticsView() {
   const [deleteConfirm, setDeleteConfirm] = useState(null)
   const [historyChoice, setHistoryChoice] = useState(null)
 
-  const todayStart = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return d }, [])
-  const windowEnd  = useMemo(() => new Date(todayStart.getTime() + DAY_MS), [todayStart])
+  const todayStart = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d }, [])
+  const windowEnd = useMemo(() => new Date(todayStart.getTime() + DAY_MS), [todayStart])
 
   const domainStart = useMemo(() => {
     if (moodEntries.length === 0) return new Date(todayStart.getTime() - 2 * DAY_MS)
@@ -53,7 +53,7 @@ function AnalyticsView() {
       const [month, day, year] = e.date.split('/').map(Number)
       return new Date(year, month - 1, day).getTime()
     }))
-    const d = new Date(earliest); d.setHours(0,0,0,0); return d
+    const d = new Date(earliest); d.setHours(0, 0, 0, 0); return d
   }, [moodEntries, todayStart])
 
   const totalDays = Math.max(3, Math.ceil((windowEnd.getTime() - domainStart.getTime()) / DAY_MS))
@@ -72,8 +72,8 @@ function AnalyticsView() {
   const yesterdayStart = useMemo(() => new Date(todayStart.getTime() - DAY_MS), [todayStart])
 
   const dayLabel = (ts) => {
-    const d = new Date(ts); d.setHours(0,0,0,0)
-    if (d.getTime() === todayStart.getTime())     return 'Today'
+    const d = new Date(ts); d.setHours(0, 0, 0, 0)
+    if (d.getTime() === todayStart.getTime()) return 'Today'
     if (d.getTime() === yesterdayStart.getTime()) return 'Yesterday'
     return new Date(ts).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
   }
@@ -105,7 +105,7 @@ function AnalyticsView() {
 
   const stats = useMemo(() => {
     if (!selectedActivity) return null
-    const withAct    = moodEntries.filter(e => (e.activities || []).some(a => getActivityName(a) === selectedActivity))
+    const withAct = moodEntries.filter(e => (e.activities || []).some(a => getActivityName(a) === selectedActivity))
     const withoutAct = moodEntries.filter(e => !(e.activities || []).some(a => getActivityName(a) === selectedActivity))
     const avg = (arr) => arr.length === 0 ? null : (arr.reduce((s, e) => s + e.mood, 0) / arr.length).toFixed(1)
     return { count: withAct.length, avgWith: avg(withAct), avgWithout: avg(withoutAct) }
@@ -156,6 +156,39 @@ function AnalyticsView() {
 
   return (
     <div className="space-y-6">
+      {/* Monthly mood breakdown */}
+      <div className="bg-white rounded-lg shadow-lg p-6">
+        <h3 className="text-lg font-semibold text-gray-800 mb-1">This Month's Moods</h3>
+        <p className="text-sm text-gray-400 mb-4">
+          {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+        </p>
+        {Object.values(monthMoodCounts).every(c => c === 0) ? (
+          <p className="text-sm text-gray-400 italic">No entries this month yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {[5, 4, 3, 2, 1].map(mood => {
+              const count = monthMoodCounts[mood]
+              const total = Object.values(monthMoodCounts).reduce((s, c) => s + c, 0)
+              const pct = total > 0 ? Math.round((count / total) * 100) : 0
+              const labels = { 1: 'Very Low', 2: 'Low', 3: 'Neutral', 4: 'Good', 5: 'Excellent' }
+              const colors = { 1: '#f18a8b', 2: '#ffc58d', 3: '#efe376', 4: '#b8d44a', 5: '#7ec84a' }
+              return (
+                <div key={mood} className="flex items-center gap-3">
+                  <span className="w-16 text-sm text-gray-600 shrink-0">{labels[mood]}</span>
+                  <div className="flex-1 bg-gray-100 rounded-full h-4 overflow-hidden">
+                    <div
+                      className="h-4 rounded-full transition-all duration-500"
+                      style={{ width: `${pct}%`, backgroundColor: colors[mood] }}
+                    />
+                  </div>
+                  <span className="w-6 text-sm text-gray-500 text-right shrink-0">{count}</span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
       <div className="bg-white rounded-lg shadow-lg p-6">
         <h3 className="text-xl font-semibold text-gray-800 mb-1">Mood History</h3>
         <p className="text-sm text-gray-400 mb-4">
@@ -199,41 +232,8 @@ function AnalyticsView() {
           <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-1 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-sm">
             <span className="font-semibold text-amber-700">"{selectedActivity}"</span>
             <span className="text-gray-600">{stats.count} {stats.count === 1 ? 'entry' : 'entries'}</span>
-            {stats.avgWith    && <span className="text-gray-600">Avg mood with: <span className="font-medium text-gray-800">{stats.avgWith}</span></span>}
+            {stats.avgWith && <span className="text-gray-600">Avg mood with: <span className="font-medium text-gray-800">{stats.avgWith}</span></span>}
             {stats.avgWithout && <span className="text-gray-600">Avg mood without: <span className="font-medium text-gray-800">{stats.avgWithout}</span></span>}
-          </div>
-        )}
-      </div>
-
-      {/* Monthly mood breakdown */}
-      <div className="bg-white rounded-lg shadow-lg p-6">
-        <h3 className="text-lg font-semibold text-gray-800 mb-1">This Month's Moods</h3>
-        <p className="text-sm text-gray-400 mb-4">
-          {new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-        </p>
-        {Object.values(monthMoodCounts).every(c => c === 0) ? (
-          <p className="text-sm text-gray-400 italic">No entries this month yet.</p>
-        ) : (
-          <div className="space-y-2">
-            {[5, 4, 3, 2, 1].map(mood => {
-              const count = monthMoodCounts[mood]
-              const total = Object.values(monthMoodCounts).reduce((s, c) => s + c, 0)
-              const pct = total > 0 ? Math.round((count / total) * 100) : 0
-              const labels = { 1: 'Very Low', 2: 'Low', 3: 'Neutral', 4: 'Good', 5: 'Excellent' }
-              const colors = { 1: '#f18a8b', 2: '#ffc58d', 3: '#efe376', 4: '#b8d44a', 5: '#7ec84a' }
-              return (
-                <div key={mood} className="flex items-center gap-3">
-                  <span className="w-16 text-sm text-gray-600 shrink-0">{labels[mood]}</span>
-                  <div className="flex-1 bg-gray-100 rounded-full h-4 overflow-hidden">
-                    <div
-                      className="h-4 rounded-full transition-all duration-500"
-                      style={{ width: `${pct}%`, backgroundColor: colors[mood] }}
-                    />
-                  </div>
-                  <span className="w-6 text-sm text-gray-500 text-right shrink-0">{count}</span>
-                </div>
-              )
-            })}
           </div>
         )}
       </div>
@@ -255,11 +255,10 @@ function AnalyticsView() {
                       <button
                         key={activity}
                         onClick={() => toggleActivity(activity)}
-                        className={`px-3 py-1 rounded-full text-sm border transition-colors ${
-                          isSelected
+                        className={`px-3 py-1 rounded-full text-sm border transition-colors ${isSelected
                             ? 'bg-amber-500 text-white border-amber-500'
                             : 'bg-gray-50 text-gray-700 border-gray-300 hover:border-amber-400 hover:text-amber-600'
-                        }`}
+                          }`}
                       >
                         {activity}{count > 0 && <span className={`ml-1.5 text-xs ${isSelected ? 'text-amber-100' : 'text-gray-400'}`}>{count}</span>}
                       </button>
