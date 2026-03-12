@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react'
-import { loadData, saveData, saveFileHandleInfo, getFileHandleInfo } from '../utils/storage'
+import { loadData, saveData, saveFileHandleInfo, getFileHandleInfo, loadCustomActivities, saveCustomActivities } from '../utils/storage'
 import { createFile, openFile, writeFile, readFile } from '../utils/fileOperations'
 
 const HealthDataContext = createContext()
@@ -9,6 +9,7 @@ export function HealthDataProvider({ children }) {
   const [isLoaded, setIsLoaded] = useState(false)
   const [fileHandle, setFileHandle] = useState(null)
   const [fileStatus, setFileStatus] = useState('none') // 'none', 'saving', 'saved', 'error'
+  const [customActivities, setCustomActivities] = useState({ custom: [], deleted: [] })
   const fileHandleRef = useRef(null)
 
   // Load data on startup
@@ -17,6 +18,7 @@ export function HealthDataProvider({ children }) {
       // Load from localStorage first
       const loaded = loadData()
       setMoodEntries(loaded.moodEntries)
+      setCustomActivities(loadCustomActivities())
       setIsLoaded(true)
       
       // Try to set up file auto-save
@@ -127,6 +129,33 @@ export function HealthDataProvider({ children }) {
     setMoodEntries(moodEntries.map(e => e.id === id ? { ...updatedEntry, id } : e))
   }
 
+  // Auto-save custom activities whenever they change
+  useEffect(() => {
+    saveCustomActivities(customActivities)
+  }, [customActivities])
+
+  const addCustomActivity = (name, category) => {
+    setCustomActivities(prev => ({
+      ...prev,
+      custom: [...prev.custom, { name, category }],
+    }))
+  }
+
+  const deleteActivity = (name) => {
+    setCustomActivities(prev => ({
+      ...prev,
+      deleted: prev.deleted.includes(name) ? prev.deleted : [...prev.deleted, name],
+    }))
+  }
+
+  const deleteActivityWithHistory = (name) => {
+    deleteActivity(name)
+    setMoodEntries(prev => prev.map(entry => ({
+      ...entry,
+      activities: (entry.activities || []).filter(a => (typeof a === 'string' ? a : a.name) !== name),
+    })))
+  }
+
   const setAllData = (moodEntries) => {
     setMoodEntries(moodEntries)
   }
@@ -167,6 +196,10 @@ export function HealthDataProvider({ children }) {
         loadFromFile,
         fileHandle,
         fileStatus,
+        customActivities,
+        addCustomActivity,
+        deleteActivity,
+        deleteActivityWithHistory,
       }}
     >
       {children}

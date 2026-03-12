@@ -6,6 +6,7 @@ import WeeklyGraph from './components/WeeklyGraph'
 import HistoryView from './components/HistoryView'
 import FileManager from './components/FileManager'
 import StreakCard from './components/StreakCard'
+import AnalyticsView from './components/AnalyticsView'
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -46,6 +47,16 @@ function App() {
                 History
               </button>
               <button
+                onClick={() => setActiveTab('analytics')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'analytics'
+                    ? 'border-indigo-500 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Analytics
+              </button>
+              <button
                 onClick={() => setActiveTab('data')}
                 className={`py-4 px-1 border-b-2 font-medium text-sm ${
                   activeTab === 'data'
@@ -66,8 +77,8 @@ function App() {
                   <WeeklyGraph />
                 </div>
                 <div className="flex flex-col gap-6 lg:w-1/2">
-                  <DailyGraph />
                   <StreakCard />
+                  <DailyGraph />
                 </div>
               </div>
             </div>
@@ -79,6 +90,10 @@ function App() {
 
           {activeTab === 'data' && (
             <FileManager />
+          )}
+
+          {activeTab === 'analytics' && (
+            <AnalyticsView />
           )}
         </div>
       </div>

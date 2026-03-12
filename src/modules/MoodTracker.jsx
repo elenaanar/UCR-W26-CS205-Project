@@ -1,6 +1,12 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { useHealthData } from '../context/HealthDataContext'
 import { getTodayFormatted } from '../utils/helpers'
+import { BUILT_IN_ACTIVITY_CATEGORIES } from '../utils/activityCategories'
+
+const formatDate = (dateStr) => {
+  const [month, day, year] = dateStr.split('/').map(Number)
+  return new Date(year, month - 1, day).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+}
 
 const MOOD_LABELS = {
   1: 'Very Low',
@@ -18,71 +24,16 @@ const MOOD_COLORS = {
   5: '#b5f97c',
 }
 
-const ACTIVITY_CATEGORIES = {
-  Social: [
-    'Friends',
-    'Family',
-    'Partner',
-    'Me Time',
-    'Classmates',
-    'Social Event',
-  ],
-  Hobbies: [
-    'Reading',
-    'Music',
-    'Writing',
-    'Gaming',
-    'Movies & TV',
-    'Art / Creative',
-    'Outdoors',
-    'Walking',
-    'Exercise / Gym',
-    'Sports',
-  ],
-  Responsibilities: [
-    'Work',
-    'Studying',
-    'Homework',
-    'Class',
-    'Shopping',
-    'Errands',
-    'Cleaning',
-    'Laundry',
-    'Cooking',
-    'Appointment',
-  ],
-  Wellness: [
-    'Good Sleep',
-    'Poor Sleep',
-    'Tired',
-    'Sick',
-    'Self Care',
-    'Stressed',
-    'Hydrated',
-    'Caffeine',
-  ],
-  Weather: [
-    'Sunny',
-    'Cloudy',
-    'Rainy',
-    'Windy',
-    'Stormy',
-    'Foggy',
-    'Hot',
-    'Cold',
-  ],
-}
-
 // Find which category an activity name belongs to (for backward-compat normalization)
 function findCategory(activityName) {
-  for (const [category, activities] of Object.entries(ACTIVITY_CATEGORIES)) {
+  for (const [category, activities] of Object.entries(BUILT_IN_ACTIVITY_CATEGORIES)) {
     if (activities.includes(activityName)) return category
   }
   return 'Other'
 }
 
 function MoodTracker() {
-  const { moodEntries, addMoodEntry, deleteMoodEntry, updateMoodEntry } = useHealthData()
+  const { moodEntries, addMoodEntry, deleteMoodEntry, updateMoodEntry, customActivities, addCustomActivity, deleteActivity, deleteActivityWithHistory } = useHealthData()
   const [selectedMood, setSelectedMood] = useState(null)
   const [selectedActivities, setSelectedActivities] = useState([])
   const [notes, setNotes] = useState('')
@@ -91,7 +42,33 @@ function MoodTracker() {
   const [pickerDate, setPickerDate] = useState('')
   const [pickerTime, setPickerTime] = useState('12:00')
   const [editingEntry, setEditingEntry] = useState(null)
+  const [expandedEntryId, setExpandedEntryId] = useState(null)
+  const [editMode, setEditMode] = useState(null) // null | 'add' | 'delete'
+  const [newActivityName, setNewActivityName] = useState('')
+  const [newActivityCategory, setNewActivityCategory] = useState('')
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [deleteConfirm, setDeleteConfirm] = useState(null) // activity name pending confirmation
+  const [historyChoice, setHistoryChoice] = useState(null) // activity name pending history popup
   const dateInputRef = useRef(null)
+
+  const allCategories = useMemo(() => {
+    const merged = {}
+    Object.entries(BUILT_IN_ACTIVITY_CATEGORIES).forEach(([cat, acts]) => {
+      merged[cat] = [...acts]
+    })
+    customActivities.custom.forEach(({ name, category }) => {
+      if (!merged[category]) merged[category] = []
+      if (!merged[category].includes(name)) merged[category].push(name)
+    })
+    const deletedSet = new Set(customActivities.deleted)
+    return Object.fromEntries(
+      Object.entries(merged)
+        .map(([cat, acts]) => [cat, acts.filter(a => !deletedSet.has(a))])
+        .filter(([, acts]) => acts.length > 0)
+    )
+  }, [customActivities])
+
+  const allCategoryNames = useMemo(() => Object.keys(allCategories), [allCategories])
   const trackerRef = useRef(null)
 
   const handleSelectMood = (mood) => {
@@ -225,9 +202,6 @@ function MoodTracker() {
     return d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })
   })()
 
-  const latestEntry = moodEntries.length > 0
-    ? [...moodEntries].sort((a, b) => b.id - a.id)[0]
-    : null
 
   return (
     <div ref={trackerRef} className="bg-white rounded-lg shadow-lg p-6">
@@ -239,7 +213,7 @@ function MoodTracker() {
       {editingEntry && (
         <div className="flex items-center justify-between mb-4 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
           <span className="text-sm text-amber-700 font-medium">
-            Editing entry from {editingEntry.date}
+            Editing entry from {formatDate(editingEntry.date)}
           </span>
           <button
             onClick={cancelEditing}
@@ -284,7 +258,7 @@ function MoodTracker() {
       <div
         className={`overflow-hidden transition-all duration-500 ease-in-out ${
           selectedMood
-            ? 'max-h-[900px] opacity-100 mb-6'
+            ? 'max-h-[1600px] opacity-100 mb-6'
             : 'max-h-0 opacity-0 pointer-events-none'
         }`}
       >
@@ -297,16 +271,12 @@ function MoodTracker() {
           </p>
 
           <div className="space-y-4">
-            {Object.entries(ACTIVITY_CATEGORIES).map(([category, activities]) => (
+            {Object.entries(allCategories).map(([category, activities]) => (
               <div key={category}>
-                <h4 className="text-sm font-medium text-gray-700 mb-2">
-                  {category}
-                </h4>
-
+                <h4 className="text-sm font-medium text-gray-700 mb-2">{category}</h4>
                 <div className="flex flex-wrap gap-2">
                   {activities.map((activity) => {
                     const isSelected = selectedActivities.some((a) => a.name === activity)
-
                     return (
                       <button
                         key={activity}
@@ -315,7 +285,7 @@ function MoodTracker() {
                         className={`px-3 py-2 rounded-full text-sm font-medium border transition-colors ${isSelected
                           ? 'bg-indigo-600 text-white border-indigo-600'
                           : 'bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100'
-                          }`}
+                        }`}
                       >
                         {activity}
                       </button>
@@ -324,6 +294,135 @@ function MoodTracker() {
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Edit activities panel */}
+          <div className="mt-4">
+            <div className={`overflow-hidden transition-all duration-300 ${editMode ? 'max-h-96 opacity-100 mb-3' : 'max-h-0 opacity-0'}`}>
+              <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                {/* Tabs */}
+                <div className="flex gap-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => { setEditMode('add'); setDeleteConfirm(null) }}
+                    className={`px-3 py-1 text-sm rounded-full border transition-colors ${editMode === 'add' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-300 hover:border-indigo-400'}`}
+                  >
+                    Add activity
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setEditMode('delete'); setNewActivityName(''); setNewActivityCategory(''); setNewCategoryName('') }}
+                    className={`px-3 py-1 text-sm rounded-full border transition-colors ${editMode === 'delete' ? 'bg-red-500 text-white border-red-500' : 'bg-white text-gray-600 border-gray-300 hover:border-red-400'}`}
+                  >
+                    Remove activity
+                  </button>
+                </div>
+
+                {/* Add form */}
+                {editMode === 'add' && (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={newActivityName}
+                      onChange={(e) => setNewActivityName(e.target.value)}
+                      placeholder="Activity name"
+                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
+                    />
+                    <div className="flex gap-2">
+                      <select
+                        value={newActivityCategory}
+                        onChange={(e) => { setNewActivityCategory(e.target.value); setNewCategoryName('') }}
+                        className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 bg-white"
+                      >
+                        <option value="">Select category…</option>
+                        {allCategoryNames.map(c => <option key={c} value={c}>{c}</option>)}
+                        <option value="__new__">New category…</option>
+                      </select>
+                      {newActivityCategory === '__new__' && (
+                        <input
+                          type="text"
+                          value={newCategoryName}
+                          onChange={(e) => setNewCategoryName(e.target.value)}
+                          placeholder="Category name"
+                          className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
+                        />
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const name = newActivityName.trim()
+                        const category = newActivityCategory === '__new__' ? newCategoryName.trim() : newActivityCategory
+                        if (!name || !category) return
+                        addCustomActivity(name, category)
+                        setNewActivityName('')
+                        setNewActivityCategory('')
+                        setNewCategoryName('')
+                        setEditMode(null)
+                      }}
+                      className="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                    >
+                      Add
+                    </button>
+                  </div>
+                )}
+
+                {/* Delete list */}
+                {editMode === 'delete' && (
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {deleteConfirm ? (
+                      <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <p className="text-sm text-red-700 mb-2">
+                          Remove <span className="font-semibold">"{deleteConfirm}"</span> from the activity picker?
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => { setHistoryChoice(deleteConfirm); setDeleteConfirm(null) }}
+                            className="px-3 py-1 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                          >
+                            Yes, remove it
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteConfirm(null)}
+                            className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      Object.entries(allCategories).map(([category, activities]) => (
+                        <div key={category}>
+                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">{category}</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {activities.map(activity => (
+                              <button
+                                key={activity}
+                                type="button"
+                                onClick={() => setDeleteConfirm(activity)}
+                                className="px-2.5 py-1 text-sm bg-white border border-gray-300 rounded-full text-gray-700 hover:border-red-400 hover:text-red-600 transition-colors"
+                              >
+                                {activity}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => { setEditMode(v => v ? null : 'add'); setDeleteConfirm(null); setNewActivityName(''); setNewActivityCategory(''); setNewCategoryName('') }}
+              className="text-sm text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
+            >
+              {editMode ? '− Close' : '✎ Edit activities'}
+            </button>
           </div>
 
           <div className="mt-4">
@@ -454,25 +553,45 @@ function MoodTracker() {
         </button>
       </div>
 
-      {latestEntry && (
-        <div className="mb-6 p-4 bg-indigo-50 rounded-lg">
-          <p className="text-sm text-gray-600 mb-1">Last recorded mood:</p>
-          <p className="text-lg font-semibold text-indigo-700">
-            {latestEntry.mood} – {MOOD_LABELS[latestEntry.mood] || 'Mood'}
-          </p>
-          <p className="text-xs text-gray-500 mt-1">
-            {latestEntry.date} at {latestEntry.time}
-          </p>
-          {latestEntry.activities && latestEntry.activities.length > 0 && (
-            <p className="text-xs text-gray-500 mt-2">
-              Activities: {latestEntry.activities.map((a) => typeof a === 'string' ? a : a.name).join(', ')}
+      {/* History choice modal */}
+      {historyChoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl p-6 mx-4 max-w-sm w-full space-y-4">
+            <h3 className="text-base font-semibold text-gray-800">
+              Keep history for "{historyChoice}"?
+            </h3>
+            <p className="text-sm text-gray-500">
+              Past entries that included this activity will still show it in your history.
             </p>
-          )}
-          {latestEntry.notes && (
-            <p className="text-xs text-gray-600 mt-2 italic">
-              Note: {latestEntry.notes.length > 100 ? latestEntry.notes.substring(0, 100) + '...' : latestEntry.notes}
-            </p>
-          )}
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => { deleteActivity(historyChoice); setHistoryChoice(null); setEditMode(null) }}
+                className="w-full py-2 px-4 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                Keep history (recommended)
+              </button>
+              <button
+                type="button"
+                onClick={() => setHistoryChoice(null)}
+                className="w-full py-2 px-4 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+            <div className="border-t border-gray-200 pt-3 space-y-2">
+              <p className="text-xs text-gray-400">
+                ⚠️ <span className="font-semibold text-gray-600">This cannot be undone.</span> Erasing history will permanently remove this activity from all past entries.
+              </p>
+              <button
+                type="button"
+                onClick={() => { deleteActivityWithHistory(historyChoice); setHistoryChoice(null); setEditMode(null) }}
+                className="w-full py-1.5 px-4 text-xs text-gray-400 border border-gray-200 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-300 transition-colors"
+              >
+                Erase from history too
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -484,23 +603,29 @@ function MoodTracker() {
         ) : (
           [...moodEntries]
             .sort((a, b) => b.id - a.id)
-            .map((entry) => (
+            .map((entry, index) => {
+              const isExpanded = expandedEntryId !== null ? expandedEntryId === entry.id : index === 0
+              return (
               <div
                 key={entry.id}
-                className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                className={`rounded-lg overflow-hidden transition-colors ${isExpanded ? 'bg-indigo-50' : 'bg-gray-50 hover:bg-gray-100'}`}
               >
-                <div>
-                  <span className="font-medium text-gray-800">
-                    {entry.mood} – {MOOD_LABELS[entry.mood] || 'Mood'}
-                  </span>
-                  <span className="text-gray-500 text-sm ml-2">
-                    • {entry.date} at {entry.time}
-                  </span>
-                </div>
-                <div className="flex gap-1">
+                <div
+                  onClick={() => setExpandedEntryId(prev => (prev === entry.id || (prev === null && index === 0)) ? -1 : entry.id)}
+                  className="flex justify-between items-center p-3 cursor-pointer"
+                >
+                  <div>
+                    <span className="font-medium text-gray-800">
+                      {entry.mood} – {MOOD_LABELS[entry.mood] || 'Mood'}
+                    </span>
+                    <span className="text-gray-500 text-sm ml-2">
+                      • {formatDate(entry.date)} at {entry.time}
+                    </span>
+                  </div>
+                  <div className="flex gap-1 items-center">
                   <button
-                    onClick={() => startEditing(entry)}
-                    className="text-indigo-500 hover:text-indigo-700 p-1.5 rounded hover:bg-indigo-50 transition-colors"
+                    onClick={(e) => { e.stopPropagation(); startEditing(entry) }}
+                    className="text-indigo-500 hover:text-indigo-700 p-1.5 rounded hover:bg-indigo-100 transition-colors"
                     title="Edit this entry"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -509,8 +634,7 @@ function MoodTracker() {
                     </svg>
                   </button>
                   <button
-                    onClick={() => {
-                      if (window.confirm('Delete this mood entry?')) {
+                    onClick={(e) => { e.stopPropagation(); if (window.confirm('Delete this mood entry?')) {
                         deleteMoodEntry(entry.id)
                       }
                     }}
@@ -525,9 +649,27 @@ function MoodTracker() {
                       <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
                     </svg>
                   </button>
+                  </div>
                 </div>
+                {isExpanded && (
+                  <div className="px-3 pb-3 pt-1 bg-indigo-50 space-y-1">
+                    {entry.activities && entry.activities.length > 0 && (
+                      <p className="text-xs text-gray-500">
+                        Activities: {entry.activities.map((a) => typeof a === 'string' ? a : a.name).join(', ')}
+                      </p>
+                    )}
+                    {entry.notes && (
+                      <p className="text-xs text-gray-600 italic">
+                        Note: {entry.notes.length > 100 ? entry.notes.substring(0, 100) + '...' : entry.notes}
+                      </p>
+                    )}
+                    {!entry.activities?.length && !entry.notes && (
+                      <p className="text-xs text-gray-400 italic">No activities or notes logged.</p>
+                    )}
+                  </div>
+                )}
               </div>
-            ))
+            )})
         )}
       </div>
     </div>
