@@ -19,9 +19,9 @@ const MOOD_LABELS = {
 const MOOD_COLORS = {
   1: '#f18a8b',
   2: '#ffc58d',
-  3: '#ffffbf',
-  4: '#e5f88c',
-  5: '#b5f97c',
+  3: '#efe376',
+  4: '#b8d44a',
+  5: '#8adb50',
 }
 
 // Find which category an activity name belongs to (for backward-compat normalization)
