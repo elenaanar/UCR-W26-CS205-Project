@@ -1,11 +1,15 @@
 import { useMemo } from 'react'
 import { useHealthData } from '../context/HealthDataContext'
 import { getTodayFormatted } from '../utils/helpers'
+import { doc, setDoc } from 'firebase/firestore'
+import { db } from '../firebase/firebaseConfig'
+import { useAuth } from '../context/AuthContext'
 
 function toMidnightUTC(dateStr) {
   const d = new Date(dateStr)
   return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())
 }
+
 
 function computeStreaks(moodEntries) {
   if (moodEntries.length === 0) return { current: 0, longest: 0, hasEntryToday: false }
@@ -45,6 +49,28 @@ function computeStreaks(moodEntries) {
 }
 
 function StreakCard() {
+  const { user } = useAuth()
+
+  const testWrite = async () => {
+    if (!user) {
+      console.log("No user logged in")
+      return
+    }
+
+    try {
+      await setDoc(doc(db, "users", user.uid, "moodEntries", "test"), {
+        mood: 5,
+        date: "today",
+        timestamp: new Date().toISOString(),
+        activities: []
+      })
+
+      console.log("Firestore write successful")
+    } catch (err) {
+      console.error("Firestore write failed", err)
+    }
+  }
+
   const { moodEntries } = useHealthData()
 
   const { current, longest, hasEntryToday } = useMemo(
@@ -93,7 +119,11 @@ function StreakCard() {
           )}
         </div>
       </div>
+      <button onClick={testWrite}>
+        Test Firestore Write
+      </button>
     </div>
+    
   )
 }
 
