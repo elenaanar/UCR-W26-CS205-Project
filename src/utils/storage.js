@@ -59,3 +59,9 @@ export function saveCustomActivities(data) {
     console.error('Error saving custom activities:', error)
   }
 }
+
+export function clearAllLocalData() {
+  localStorage.removeItem(STORAGE_KEY)
+  localStorage.removeItem(CUSTOM_ACTIVITIES_KEY)
+  localStorage.removeItem(FILE_HANDLE_KEY)
+}

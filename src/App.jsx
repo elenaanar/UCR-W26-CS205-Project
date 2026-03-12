@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { HealthDataProvider } from './context/HealthDataContext'
+import { clearAllLocalData } from './utils/storage'
 import MoodTracker from './modules/MoodTracker'
 import DailyGraph from './components/DailyGraph'
 import WeeklyGraph from './components/WeeklyGraph'
@@ -42,7 +43,12 @@ function AuthWidget() {
       )}
       <span className="text-sm text-gray-700 font-medium hidden sm:block">{user.displayName ?? user.email}</span>
       <button
-        onClick={logout}
+        onClick={() => {
+          if (window.confirm('Are you sure you want to sign out?')) {
+            clearAllLocalData()
+            logout()
+          }
+        }}
         className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
       >
         Sign out

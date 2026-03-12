@@ -1,10 +1,16 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react'
 import { loadData, saveData, saveFileHandleInfo, getFileHandleInfo, loadCustomActivities, saveCustomActivities } from '../utils/storage'
 import { createFile, openFile, writeFile, readFile } from '../utils/fileOperations'
+import { useAuth } from './AuthContext'
+import {
+  fetchUserMoodEntries, saveUserMoodEntry, deleteUserMoodEntry,
+  fetchUserCustomActivities, saveUserCustomActivities, batchSaveUserMoodEntries,
+} from '../firebase/firestoreHelpers'
 
 const HealthDataContext = createContext()
 
 export function HealthDataProvider({ children }) {
+  const { user } = useAuth()
   const [moodEntries, setMoodEntries] = useState([])
   const [isLoaded, setIsLoaded] = useState(false)
   const [fileHandle, setFileHandle] = useState(null)
@@ -12,15 +18,14 @@ export function HealthDataProvider({ children }) {
   const [customActivities, setCustomActivities] = useState({ custom: [], deleted: [] })
   const fileHandleRef = useRef(null)
 
-  // Load data on startup
+  // Load from localStorage on startup (fast, synchronous)
   useEffect(() => {
     async function initialize() {
-      // Load from localStorage first
       const loaded = loadData()
       setMoodEntries(loaded.moodEntries)
       setCustomActivities(loadCustomActivities())
       setIsLoaded(true)
-      
+
       // Try to set up file auto-save
       const handleInfo = getFileHandleInfo()
       if (handleInfo && 'showOpenFilePicker' in window) {
@@ -28,15 +33,13 @@ export function HealthDataProvider({ children }) {
         if (handle) {
           fileHandleRef.current = handle
           setFileHandle(handle)
-          
-          // Load data from file if it's newer
+
           const fileData = await readFile(handle)
           if (fileData?.moodEntries) {
             const fileDate = fileData.lastSaved ? new Date(fileData.lastSaved) : null
-            const storageDate = loaded.moodEntries.length > 0 
-              ? new Date(Math.max(...loaded.moodEntries.map(e => e.id))) 
+            const storageDate = loaded.moodEntries.length > 0
+              ? new Date(Math.max(...loaded.moodEntries.map(e => e.id)))
               : null
-            
             if (!storageDate || (fileDate && fileDate > storageDate)) {
               setMoodEntries(fileData.moodEntries)
               saveData(fileData.moodEntries)
@@ -44,7 +47,6 @@ export function HealthDataProvider({ children }) {
           }
         }
       } else {
-        // Auto-setup file on first use
         const handle = await createFile()
         if (handle) {
           fileHandleRef.current = handle
@@ -58,11 +60,30 @@ export function HealthDataProvider({ children }) {
         }
       }
     }
-    
     initialize()
   }, [])
 
-  // Auto-save to localStorage and file when data changes
+  // When auth state changes after load: switch data source
+  useEffect(() => {
+    if (!isLoaded) return
+    if (user) {
+      // Logged in — Firestore is source of truth
+      Promise.all([
+        fetchUserMoodEntries(user.uid),
+        fetchUserCustomActivities(user.uid),
+      ]).then(([entries, activities]) => {
+        setMoodEntries(entries)
+        setCustomActivities(activities)
+      }).catch(console.error)
+    } else {
+      // Logged out — fall back to localStorage
+      const loaded = loadData()
+      setMoodEntries(loaded.moodEntries)
+      setCustomActivities(loadCustomActivities())
+    }
+  }, [user, isLoaded])
+
+  // Auto-save to localStorage and file when entries change
   useEffect(() => {
     if (isLoaded) {
       saveData(moodEntries)
@@ -73,14 +94,12 @@ export function HealthDataProvider({ children }) {
   async function saveToFile() {
     const handle = fileHandleRef.current
     if (!handle) return
-
     setFileStatus('saving')
     const success = await writeFile(handle, {
       moodEntries,
       customActivities,
       lastSaved: new Date().toISOString()
     })
-    
     if (success) {
       setFileStatus('saved')
       setTimeout(() => setFileStatus('none'), 2000)
@@ -108,7 +127,6 @@ export function HealthDataProvider({ children }) {
       fileHandleRef.current = handle
       setFileHandle(handle)
       saveFileHandleInfo(handle)
-      
       const data = await readFile(handle)
       if (data?.moodEntries) {
         setMoodEntries(data.moodEntries)
@@ -124,23 +142,27 @@ export function HealthDataProvider({ children }) {
   }
 
   const addMoodEntry = (entry) => {
-    setMoodEntries([...moodEntries, entry])
+    setMoodEntries(prev => [...prev, entry])
+    if (user) saveUserMoodEntry(user.uid, entry).catch(console.error)
   }
 
   const deleteMoodEntry = (id) => {
-    setMoodEntries(moodEntries.filter(entry => entry.id !== id))
+    setMoodEntries(prev => prev.filter(e => e.id !== id))
+    if (user) deleteUserMoodEntry(user.uid, id).catch(console.error)
   }
 
   const updateMoodEntry = (id, updatedEntry) => {
-    setMoodEntries(moodEntries.map(e => e.id === id ? { ...updatedEntry, id } : e))
+    const entry = { ...updatedEntry, id }
+    setMoodEntries(prev => prev.map(e => e.id === id ? entry : e))
+    if (user) saveUserMoodEntry(user.uid, entry).catch(console.error)
   }
 
-  // Auto-save custom activities whenever they change (guard with isLoaded to avoid wiping on mount)
+  // Auto-save custom activities to localStorage (and Firestore when logged in)
   useEffect(() => {
-    if (isLoaded) {
-      saveCustomActivities(customActivities)
-    }
-  }, [customActivities, isLoaded])
+    if (!isLoaded) return
+    saveCustomActivities(customActivities)
+    if (user) saveUserCustomActivities(user.uid, customActivities).catch(console.error)
+  }, [customActivities, isLoaded, user])
 
   const addCustomActivity = (name, category) => {
     setCustomActivities(prev => ({
@@ -158,23 +180,31 @@ export function HealthDataProvider({ children }) {
 
   const deleteActivityWithHistory = (name) => {
     deleteActivity(name)
-    setMoodEntries(prev => prev.map(entry => ({
-      ...entry,
-      activities: (entry.activities || []).filter(a => (typeof a === 'string' ? a : a.name) !== name),
-    })))
+    setMoodEntries(prev => {
+      const updated = prev.map(entry => ({
+        ...entry,
+        activities: (entry.activities || []).filter(
+          a => (typeof a === 'string' ? a : a.name) !== name
+        ),
+      }))
+      if (user) {
+        updated.forEach((entry, i) => {
+          const hadActivity = (prev[i].activities || []).some(
+            a => (typeof a === 'string' ? a : a.name) === name
+          )
+          if (hadActivity) saveUserMoodEntry(user.uid, entry).catch(console.error)
+        })
+      }
+      return updated
+    })
   }
 
-  const setAllData = (moodEntries) => {
-    setMoodEntries(moodEntries)
+  const setAllData = (entries) => {
+    setMoodEntries(entries)
   }
 
   const exportData = () => {
-    const data = {
-      moodEntries,
-      customActivities,
-      exportedAt: new Date().toISOString(),
-    }
-    return JSON.stringify(data, null, 2)
+    return JSON.stringify({ moodEntries, customActivities, exportedAt: new Date().toISOString() }, null, 2)
   }
 
   const importData = (jsonString) => {
@@ -185,6 +215,12 @@ export function HealthDataProvider({ children }) {
         if (data.customActivities) {
           setCustomActivities(data.customActivities)
           saveCustomActivities(data.customActivities)
+        }
+        if (user) {
+          batchSaveUserMoodEntries(user.uid, data.moodEntries).catch(console.error)
+          if (data.customActivities) {
+            saveUserCustomActivities(user.uid, data.customActivities).catch(console.error)
+          }
         }
         return true
       }
