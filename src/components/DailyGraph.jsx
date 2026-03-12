@@ -101,7 +101,7 @@ function DailyGraph() {
             ticks={ticks}
             tickFormatter={ts => dayLabel(ts)}
           />
-          <YAxis domain={[1, 5]} ticks={[1, 2, 3, 4, 5]} />
+          <YAxis domain={[0.5, 5.5]} ticks={[1, 2, 3, 4, 5]} />
           <Tooltip formatter={tooltipFormatter} labelFormatter={() => ''} />
           {ticks.map(t => (
             <ReferenceLine key={t} x={t} stroke="#d1d5db" strokeDasharray="4 4" />
