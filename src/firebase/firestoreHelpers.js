@@ -1,5 +1,5 @@
 import { db } from './firebaseConfig'
-import { collection, doc, setDoc, deleteDoc, getDocs, getDoc, writeBatch } from 'firebase/firestore'
+import { collection, doc, setDoc, deleteDoc, getDocs, getDoc, writeBatch, onSnapshot } from 'firebase/firestore'
 
 const entriesCol    = (uid) => collection(db, 'users', uid, 'moodEntries')
 const entryDoc      = (uid, id) => doc(db, 'users', uid, 'moodEntries', String(id))
@@ -25,6 +25,16 @@ export async function fetchUserCustomActivities(uid) {
 
 export async function saveUserCustomActivities(uid, data) {
   await setDoc(activitiesDoc(uid), data)
+}
+
+export function subscribeToUserMoodEntries(uid, callback) {
+  return onSnapshot(entriesCol(uid), snap => callback(snap.docs.map(d => d.data())))
+}
+
+export function subscribeToUserCustomActivities(uid, callback) {
+  return onSnapshot(activitiesDoc(uid), snap =>
+    callback(snap.exists() ? snap.data() : { custom: [], deleted: [] })
+  )
 }
 
 // Overwrites all entries at once — used by importData (max 500 per batch)

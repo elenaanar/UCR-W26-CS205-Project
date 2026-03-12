@@ -3,8 +3,9 @@ import { loadData, saveData, saveFileHandleInfo, getFileHandleInfo, loadCustomAc
 import { createFile, openFile, writeFile, readFile } from '../utils/fileOperations'
 import { useAuth, isNative } from './AuthContext'
 import {
-  fetchUserMoodEntries, saveUserMoodEntry, deleteUserMoodEntry,
-  fetchUserCustomActivities, saveUserCustomActivities, batchSaveUserMoodEntries,
+  saveUserMoodEntry, deleteUserMoodEntry,
+  saveUserCustomActivities, batchSaveUserMoodEntries,
+  subscribeToUserMoodEntries, subscribeToUserCustomActivities,
   fetchUserMoodEntriesREST, saveUserMoodEntryREST, deleteUserMoodEntryREST,
   fetchUserCustomActivitiesREST, saveUserCustomActivitiesREST, batchSaveUserMoodEntriesREST,
 } from '../firebase/firestoreHelpers'
@@ -21,6 +22,8 @@ export function HealthDataProvider({ children }) {
   const fileHandleRef = useRef(null)
   const firebaseUserRef = useRef(firebaseUser)
   const userRef = useRef(user)
+  // When true, the next customActivities change came from Firestore — skip writing back to Firestore
+  const remoteActivitiesRef = useRef(false)
   useEffect(() => { firebaseUserRef.current = firebaseUser }, [firebaseUser])
   useEffect(() => { userRef.current = user }, [user])
 
@@ -79,44 +82,50 @@ export function HealthDataProvider({ children }) {
     initialize()
   }, [])
 
-  // When auth state changes: switch data source.
+  // When auth state changes: switch data source and set up real-time sync.
   useEffect(() => {
     if (!isLoaded) return
+
     if (firebaseUser) {
-      // JS SDK auth active — use Firestore JS SDK
-      console.log('[Data] firebaseUser set, fetching from Firestore JS SDK...')
-      Promise.all([
-        fetchUserMoodEntries(firebaseUser.uid),
-        fetchUserCustomActivities(firebaseUser.uid),
-      ]).then(([entries, activities]) => {
-        console.log('[Data] Firestore fetch succeeded, entries:', entries.length)
+      // JS SDK auth — real-time Firestore listeners
+      console.log('[Data] firebaseUser set, subscribing to Firestore...')
+      const unsubEntries = subscribeToUserMoodEntries(firebaseUser.uid, entries => {
+        console.log('[Data] onSnapshot entries:', entries.length)
         setMoodEntries(entries)
-        setCustomActivities(activities)
-      }).catch(err => {
-        console.error('[Data] Firestore JS fetch failed:', err?.code, err?.message)
       })
+      const unsubActivities = subscribeToUserCustomActivities(firebaseUser.uid, activities => {
+        console.log('[Data] onSnapshot activities')
+        remoteActivitiesRef.current = true
+        setCustomActivities(activities)
+      })
+      return () => { unsubEntries(); unsubActivities() }
+
     } else if (isNative && user) {
-      // iOS native auth only — use Firestore REST API with plugin token
+      // iOS native auth only — REST fetch + 30s polling (no real-time available)
       console.log('[Data] native user set (no firebaseUser), fetching via REST API...')
-      getNativeToken().then(token => {
-        if (!token) { console.warn('[Data] no native token, skipping REST fetch'); return }
-        return Promise.all([
-          fetchUserMoodEntriesREST(user.uid, token),
-          fetchUserCustomActivitiesREST(user.uid, token),
-        ])
-      }).then(result => {
-        if (!result) return
-        const [entries, activities] = result
-        console.log('[Data] REST fetch succeeded, entries:', entries.length)
-        setMoodEntries(entries)
-        setCustomActivities(activities)
-      }).catch(err => {
-        console.error('[Data] REST fetch failed:', err?.message)
-      })
+      const fetchData = () => {
+        getNativeToken().then(token => {
+          if (!token) { console.warn('[Data] no native token'); return null }
+          return Promise.all([
+            fetchUserMoodEntriesREST(user.uid, token),
+            fetchUserCustomActivitiesREST(user.uid, token),
+          ])
+        }).then(result => {
+          if (!result) return
+          const [entries, activities] = result
+          console.log('[Data] REST fetch succeeded, entries:', entries.length)
+          remoteActivitiesRef.current = true
+          setMoodEntries(entries)
+          setCustomActivities(activities)
+        }).catch(err => console.error('[Data] REST fetch failed:', err?.message))
+      }
+      fetchData()
+      const interval = setInterval(fetchData, 30000)
+      return () => clearInterval(interval)
+
     } else if (!user) {
       // Logged out
-      const loaded = loadData()
-      setMoodEntries(loaded.moodEntries)
+      setMoodEntries(loadData().moodEntries)
       setCustomActivities(loadCustomActivities())
     }
   }, [firebaseUser, user, isLoaded])
@@ -205,10 +214,15 @@ export function HealthDataProvider({ children }) {
   }
 
   // Auto-save custom activities to localStorage (and Firestore when logged in).
-  // Uses refs for firebaseUser/user to avoid saving stale data on auth state changes.
+  // Uses refs to avoid stale closures on auth changes and to skip write-back when
+  // the update came from a Firestore snapshot (remoteActivitiesRef flag).
   useEffect(() => {
     if (!isLoaded) return
     saveCustomActivities(customActivities)
+    if (remoteActivitiesRef.current) {
+      remoteActivitiesRef.current = false
+      return // came from Firestore — don't write back
+    }
     const fbUser = firebaseUserRef.current
     const currentUser = userRef.current
     if (fbUser) {
