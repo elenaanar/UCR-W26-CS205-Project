@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">MoodHaven</string>
-    <string name="title_activity_main">MoodHaven</string>
-    <string name="package_name">com.moodhaven.app</string>
-    <string name="custom_url_scheme">com.moodhaven.app</string>
+    <string name="app_name">Mood Tracker</string>
+    <string name="title_activity_main">Mood Tracker</string>
+    <string name="package_name">com.elena.moodtracker</string>
+    <string name="custom_url_scheme">com.elena.moodtracker</string>
 </resources>

@@ -25,14 +25,14 @@ function AuthWidget() {
   if (!user) {
     return isNative ? (
       <button
-        onClick={signInWithGoogle}
-        className="w-10 h-10 flex items-center justify-center bg-white border border-gray-300 rounded-full shadow-sm"
+        onClick={() => { console.log('[Button] native Google button tapped'); signInWithGoogle() }}
+        className="w-10 h-10 flex items-center justify-center bg-white border border-gray-300 rounded-full shadow-sm active:opacity-50"
       >
         {googleIcon}
       </button>
     ) : (
       <button
-        onClick={signInWithGoogle}
+        onClick={() => { console.log('[Button] web Google button clicked'); signInWithGoogle() }}
         className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm transition-colors"
       >
         {googleIcon}
@@ -68,24 +68,6 @@ function AuthWidget() {
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState('dashboard')
-
-  const handleGoogleLogin = async () => {
-    try {
-      const result = await signInWithPopup(auth, googleProvider)
-      console.log('Signed in user:', result.user)
-    } catch (error) {
-      console.error('Google sign-in error:', error)
-    }
-  }
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth)
-      console.log('Signed out')
-    } catch (error) {
-      console.error('Logout error:', error)
-    }
-  }
 
   return (
     <HealthDataProvider>
@@ -149,23 +131,6 @@ function AppContent() {
               </button>
             </nav>
           </div>
-          {/* Google Login Buttons */}
-                    <div className="mb-4 flex gap-2">
-            <button
-              onClick={handleGoogleLogin}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg"
-            >
-              Sign in with Google
-            </button>
-
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg"
-            >
-              Log out
-            </button>
-          </div>
-{/* Google Login Buttons */}
 
           {activeTab === 'dashboard' && (
             <div className="space-y-6">

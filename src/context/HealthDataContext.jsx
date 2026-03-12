@@ -10,7 +10,7 @@ import {
 const HealthDataContext = createContext()
 
 export function HealthDataProvider({ children }) {
-  const { user } = useAuth()
+  const { user, firebaseUser } = useAuth()
   const [moodEntries, setMoodEntries] = useState([])
   const [isLoaded, setIsLoaded] = useState(false)
   const [fileHandle, setFileHandle] = useState(null)
@@ -63,25 +63,30 @@ export function HealthDataProvider({ children }) {
     initialize()
   }, [])
 
-  // When auth state changes after load: switch data source
+  // When auth state changes after load: switch data source.
+  // Uses firebaseUser (JS Firebase SDK authed) for Firestore so auth.currentUser is guaranteed set.
   useEffect(() => {
     if (!isLoaded) return
-    if (user) {
-      // Logged in — Firestore is source of truth
+    if (firebaseUser) {
+      console.log('[Data] firebaseUser signed in, uid:', firebaseUser.uid, 'fetching from Firestore...')
       Promise.all([
-        fetchUserMoodEntries(user.uid),
-        fetchUserCustomActivities(user.uid),
+        fetchUserMoodEntries(firebaseUser.uid),
+        fetchUserCustomActivities(firebaseUser.uid),
       ]).then(([entries, activities]) => {
+        console.log('[Data] Firestore fetch succeeded, entries:', entries.length)
         setMoodEntries(entries)
         setCustomActivities(activities)
-      }).catch(console.error)
-    } else {
-      // Logged out — fall back to localStorage
+      }).catch(err => {
+        console.error('[Data] Firestore fetch failed:', err?.code, err?.message)
+      })
+    } else if (!user) {
+      // Fully logged out — fall back to localStorage
       const loaded = loadData()
       setMoodEntries(loaded.moodEntries)
       setCustomActivities(loadCustomActivities())
     }
-  }, [user, isLoaded])
+    // If user is set (plugin fallback) but firebaseUser is null, wait — onAuthStateChanged will fire
+  }, [firebaseUser, user, isLoaded])
 
   // Auto-save to localStorage and file when entries change
   useEffect(() => {
@@ -143,26 +148,26 @@ export function HealthDataProvider({ children }) {
 
   const addMoodEntry = (entry) => {
     setMoodEntries(prev => [...prev, entry])
-    if (user) saveUserMoodEntry(user.uid, entry).catch(console.error)
+    if (firebaseUser) saveUserMoodEntry(firebaseUser.uid, entry).catch(console.error)
   }
 
   const deleteMoodEntry = (id) => {
     setMoodEntries(prev => prev.filter(e => e.id !== id))
-    if (user) deleteUserMoodEntry(user.uid, id).catch(console.error)
+    if (firebaseUser) deleteUserMoodEntry(firebaseUser.uid, id).catch(console.error)
   }
 
   const updateMoodEntry = (id, updatedEntry) => {
     const entry = { ...updatedEntry, id }
     setMoodEntries(prev => prev.map(e => e.id === id ? entry : e))
-    if (user) saveUserMoodEntry(user.uid, entry).catch(console.error)
+    if (firebaseUser) saveUserMoodEntry(firebaseUser.uid, entry).catch(console.error)
   }
 
   // Auto-save custom activities to localStorage (and Firestore when logged in)
   useEffect(() => {
     if (!isLoaded) return
     saveCustomActivities(customActivities)
-    if (user) saveUserCustomActivities(user.uid, customActivities).catch(console.error)
-  }, [customActivities, isLoaded, user])
+    if (firebaseUser) saveUserCustomActivities(firebaseUser.uid, customActivities).catch(console.error)
+  }, [customActivities, isLoaded, firebaseUser])
 
   const addCustomActivity = (name, category) => {
     setCustomActivities(prev => ({
@@ -187,12 +192,12 @@ export function HealthDataProvider({ children }) {
           a => (typeof a === 'string' ? a : a.name) !== name
         ),
       }))
-      if (user) {
+      if (firebaseUser) {
         updated.forEach((entry, i) => {
           const hadActivity = (prev[i].activities || []).some(
             a => (typeof a === 'string' ? a : a.name) === name
           )
-          if (hadActivity) saveUserMoodEntry(user.uid, entry).catch(console.error)
+          if (hadActivity) saveUserMoodEntry(firebaseUser.uid, entry).catch(console.error)
         })
       }
       return updated
@@ -216,10 +221,10 @@ export function HealthDataProvider({ children }) {
           setCustomActivities(data.customActivities)
           saveCustomActivities(data.customActivities)
         }
-        if (user) {
-          batchSaveUserMoodEntries(user.uid, data.moodEntries).catch(console.error)
+        if (firebaseUser) {
+          batchSaveUserMoodEntries(firebaseUser.uid, data.moodEntries).catch(console.error)
           if (data.customActivities) {
-            saveUserCustomActivities(user.uid, data.customActivities).catch(console.error)
+            saveUserCustomActivities(firebaseUser.uid, data.customActivities).catch(console.error)
           }
         }
         return true
