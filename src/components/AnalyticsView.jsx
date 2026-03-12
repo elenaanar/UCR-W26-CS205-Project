@@ -3,6 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine } 
 import { useHealthData } from '../context/HealthDataContext'
 import { BUILT_IN_ACTIVITY_CATEGORIES } from '../utils/activityCategories'
 
+
 const DAY_MS = 86400000
 const PX_PER_DAY = 200
 
@@ -17,7 +18,7 @@ function CustomDot({ cx, cy, payload, selectedActivity }) {
 }
 
 function AnalyticsView() {
-  const { moodEntries, customActivities } = useHealthData()
+  const { moodEntries, customActivities, addCustomActivity, deleteActivity, deleteActivityWithHistory } = useHealthData()
 
   const allCategories = useMemo(() => {
     const merged = {}
@@ -35,6 +36,12 @@ function AnalyticsView() {
   }, [customActivities])
   const scrollRef = useRef(null)
   const [selectedActivity, setSelectedActivity] = useState(null)
+  const [editMode, setEditMode] = useState(null)
+  const [newActivityName, setNewActivityName] = useState('')
+  const [newActivityCategory, setNewActivityCategory] = useState('')
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const [historyChoice, setHistoryChoice] = useState(null)
 
   const todayStart = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return d }, [])
   const windowEnd  = useMemo(() => new Date(todayStart.getTime() + DAY_MS), [todayStart])
@@ -129,6 +136,8 @@ function AnalyticsView() {
   }, [moodEntries])
 
   const toggleActivity = (name) => setSelectedActivity(prev => prev === name ? null : name)
+
+  const allCategoryNames = useMemo(() => Object.keys(allCategories), [allCategories])
 
   const monthMoodCounts = useMemo(() => {
     const now = new Date()
@@ -261,7 +270,165 @@ function AnalyticsView() {
             )
           })}
         </div>
+
+        {/* Edit activities panel */}
+        <div className="mt-5 pt-4 border-t border-gray-100">
+          <div className={`overflow-hidden transition-all duration-300 ${editMode ? 'max-h-96 opacity-100 mb-3' : 'max-h-0 opacity-0'}`}>
+            <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="flex gap-2 mb-3">
+                <button
+                  onClick={() => { setEditMode('add'); setDeleteConfirm(null) }}
+                  className={`px-3 py-1 text-sm rounded-full border transition-colors ${editMode === 'add' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-300 hover:border-indigo-400'}`}
+                >
+                  Add activity
+                </button>
+                <button
+                  onClick={() => { setEditMode('delete'); setNewActivityName(''); setNewActivityCategory(''); setNewCategoryName('') }}
+                  className={`px-3 py-1 text-sm rounded-full border transition-colors ${editMode === 'delete' ? 'bg-red-500 text-white border-red-500' : 'bg-white text-gray-600 border-gray-300 hover:border-red-400'}`}
+                >
+                  Remove activity
+                </button>
+              </div>
+
+              {editMode === 'add' && (
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={newActivityName}
+                    onChange={(e) => setNewActivityName(e.target.value)}
+                    placeholder="Activity name"
+                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
+                  />
+                  <div className="flex gap-2">
+                    <select
+                      value={newActivityCategory}
+                      onChange={(e) => { setNewActivityCategory(e.target.value); setNewCategoryName('') }}
+                      className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 bg-white"
+                    >
+                      <option value="">Select category…</option>
+                      {allCategoryNames.map(c => <option key={c} value={c}>{c}</option>)}
+                      <option value="__new__">New category…</option>
+                    </select>
+                    {newActivityCategory === '__new__' && (
+                      <input
+                        type="text"
+                        value={newCategoryName}
+                        onChange={(e) => setNewCategoryName(e.target.value)}
+                        placeholder="Category name"
+                        className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
+                      />
+                    )}
+                  </div>
+                  <button
+                    onClick={() => {
+                      const name = newActivityName.trim()
+                      const category = newActivityCategory === '__new__' ? newCategoryName.trim() : newActivityCategory
+                      if (!name || !category) return
+                      addCustomActivity(name, category)
+                      setNewActivityName('')
+                      setNewActivityCategory('')
+                      setNewCategoryName('')
+                      setEditMode(null)
+                    }}
+                    className="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                  >
+                    Add
+                  </button>
+                </div>
+              )}
+
+              {editMode === 'delete' && (
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {deleteConfirm ? (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="text-sm text-red-700 mb-2">
+                        Remove <span className="font-semibold">"{deleteConfirm}"</span> from the activity picker?
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => { setHistoryChoice(deleteConfirm); setDeleteConfirm(null) }}
+                          className="px-3 py-1 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                        >
+                          Yes, remove it
+                        </button>
+                        <button
+                          onClick={() => setDeleteConfirm(null)}
+                          className="px-3 py-1 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    Object.entries(allCategories).map(([category, activities]) => (
+                      <div key={category}>
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">{category}</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {activities.map(activity => (
+                            <button
+                              key={activity}
+                              onClick={() => setDeleteConfirm(activity)}
+                              className="px-2.5 py-1 text-sm bg-white border border-gray-300 rounded-full text-gray-700 hover:border-red-400 hover:text-red-600 transition-colors"
+                            >
+                              {activity}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <button
+            onClick={() => { setEditMode(v => v ? null : 'add'); setDeleteConfirm(null); setNewActivityName(''); setNewActivityCategory(''); setNewCategoryName('') }}
+            className="text-sm text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
+          >
+            {editMode ? '− Close' : '✎ Edit activities'}
+          </button>
+        </div>
       </div>
+
+      {/* History choice modal */}
+      {historyChoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl p-6 mx-4 max-w-sm w-full space-y-4">
+            <h3 className="text-base font-semibold text-gray-800">
+              Keep history for "{historyChoice}"?
+            </h3>
+            <p className="text-sm text-gray-500">
+              Past entries that included this activity will still show it in your history.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => { deleteActivity(historyChoice); setHistoryChoice(null); setEditMode(null) }}
+                className="w-full py-2 px-4 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              >
+                Keep history (recommended)
+              </button>
+              <button
+                onClick={() => setHistoryChoice(null)}
+                className="w-full py-2 px-4 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+            <div className="border-t border-gray-200 pt-3 space-y-2">
+              <p className="text-xs text-gray-400">
+                ⚠️ <span className="font-semibold text-gray-600">This cannot be undone.</span> Erasing history will permanently remove this activity from all past entries.
+              </p>
+              <button
+                onClick={() => { deleteActivityWithHistory(historyChoice); setHistoryChoice(null); setEditMode(null) }}
+                className="w-full py-1.5 px-4 text-xs text-gray-400 border border-gray-200 rounded-lg hover:bg-red-50 hover:text-red-600 hover:border-red-300 transition-colors"
+              >
+                Erase from history too
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
