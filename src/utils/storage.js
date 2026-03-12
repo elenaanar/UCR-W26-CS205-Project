@@ -1,5 +1,6 @@
 const STORAGE_KEY = 'healthTrackingData'
 const FILE_HANDLE_KEY = 'healthTrackingFileHandle'
+const CUSTOM_ACTIVITIES_KEY = 'customActivities'
 
 export function loadData() {
   try {
@@ -38,5 +39,23 @@ export function getFileHandleInfo() {
     return stored ? JSON.parse(stored) : null
   } catch (error) {
     return null
+  }
+}
+
+export function loadCustomActivities() {
+  try {
+    const stored = localStorage.getItem(CUSTOM_ACTIVITIES_KEY)
+    if (stored) return JSON.parse(stored)
+  } catch (error) {
+    console.error('Error loading custom activities:', error)
+  }
+  return { custom: [], deleted: [] }
+}
+
+export function saveCustomActivities(data) {
+  try {
+    localStorage.setItem(CUSTOM_ACTIVITIES_KEY, JSON.stringify(data))
+  } catch (error) {
+    console.error('Error saving custom activities:', error)
   }
 }

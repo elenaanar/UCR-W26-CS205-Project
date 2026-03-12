@@ -1,6 +1,7 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { useHealthData } from '../context/HealthDataContext'
 import { getTodayFormatted } from '../utils/helpers'
+import { BUILT_IN_ACTIVITY_CATEGORIES } from '../utils/activityCategories'
 
 const formatDate = (dateStr) => {
   const [month, day, year] = dateStr.split('/').map(Number)
@@ -23,71 +24,16 @@ const MOOD_COLORS = {
   5: '#b5f97c',
 }
 
-const ACTIVITY_CATEGORIES = {
-  Social: [
-    'Friends',
-    'Family',
-    'Partner',
-    'Me Time',
-    'Classmates',
-    'Social Event',
-  ],
-  Hobbies: [
-    'Reading',
-    'Music',
-    'Writing',
-    'Gaming',
-    'Movies & TV',
-    'Art / Creative',
-    'Outdoors',
-    'Walking',
-    'Exercise / Gym',
-    'Sports',
-  ],
-  Responsibilities: [
-    'Work',
-    'Studying',
-    'Homework',
-    'Class',
-    'Shopping',
-    'Errands',
-    'Cleaning',
-    'Laundry',
-    'Cooking',
-    'Appointment',
-  ],
-  Wellness: [
-    'Good Sleep',
-    'Poor Sleep',
-    'Tired',
-    'Sick',
-    'Self Care',
-    'Stressed',
-    'Hydrated',
-    'Caffeine',
-  ],
-  Weather: [
-    'Sunny',
-    'Cloudy',
-    'Rainy',
-    'Windy',
-    'Stormy',
-    'Foggy',
-    'Hot',
-    'Cold',
-  ],
-}
-
 // Find which category an activity name belongs to (for backward-compat normalization)
 function findCategory(activityName) {
-  for (const [category, activities] of Object.entries(ACTIVITY_CATEGORIES)) {
+  for (const [category, activities] of Object.entries(BUILT_IN_ACTIVITY_CATEGORIES)) {
     if (activities.includes(activityName)) return category
   }
   return 'Other'
 }
 
 function MoodTracker() {
-  const { moodEntries, addMoodEntry, deleteMoodEntry, updateMoodEntry } = useHealthData()
+  const { moodEntries, addMoodEntry, deleteMoodEntry, updateMoodEntry, customActivities, addCustomActivity } = useHealthData()
   const [selectedMood, setSelectedMood] = useState(null)
   const [selectedActivities, setSelectedActivities] = useState([])
   const [notes, setNotes] = useState('')
@@ -97,7 +43,30 @@ function MoodTracker() {
   const [pickerTime, setPickerTime] = useState('12:00')
   const [editingEntry, setEditingEntry] = useState(null)
   const [expandedEntryId, setExpandedEntryId] = useState(null)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [newActivityName, setNewActivityName] = useState('')
+  const [newActivityCategory, setNewActivityCategory] = useState('')
+  const [newCategoryName, setNewCategoryName] = useState('')
   const dateInputRef = useRef(null)
+
+  const allCategories = useMemo(() => {
+    const merged = {}
+    Object.entries(BUILT_IN_ACTIVITY_CATEGORIES).forEach(([cat, acts]) => {
+      merged[cat] = [...acts]
+    })
+    customActivities.custom.forEach(({ name, category }) => {
+      if (!merged[category]) merged[category] = []
+      if (!merged[category].includes(name)) merged[category].push(name)
+    })
+    const deletedSet = new Set(customActivities.deleted)
+    return Object.fromEntries(
+      Object.entries(merged)
+        .map(([cat, acts]) => [cat, acts.filter(a => !deletedSet.has(a))])
+        .filter(([, acts]) => acts.length > 0)
+    )
+  }, [customActivities])
+
+  const allCategoryNames = useMemo(() => Object.keys(allCategories), [allCategories])
   const trackerRef = useRef(null)
 
   const handleSelectMood = (mood) => {
@@ -300,16 +269,12 @@ function MoodTracker() {
           </p>
 
           <div className="space-y-4">
-            {Object.entries(ACTIVITY_CATEGORIES).map(([category, activities]) => (
+            {Object.entries(allCategories).map(([category, activities]) => (
               <div key={category}>
-                <h4 className="text-sm font-medium text-gray-700 mb-2">
-                  {category}
-                </h4>
-
+                <h4 className="text-sm font-medium text-gray-700 mb-2">{category}</h4>
                 <div className="flex flex-wrap gap-2">
                   {activities.map((activity) => {
                     const isSelected = selectedActivities.some((a) => a.name === activity)
-
                     return (
                       <button
                         key={activity}
@@ -318,7 +283,7 @@ function MoodTracker() {
                         className={`px-3 py-2 rounded-full text-sm font-medium border transition-colors ${isSelected
                           ? 'bg-indigo-600 text-white border-indigo-600'
                           : 'bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100'
-                          }`}
+                        }`}
                       >
                         {activity}
                       </button>
@@ -327,6 +292,75 @@ function MoodTracker() {
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Add custom activity */}
+          <div className="mt-4">
+            <div
+              className={`overflow-hidden transition-all duration-300 ${showAddForm ? 'max-h-40 opacity-100 mb-3' : 'max-h-0 opacity-0'}`}
+            >
+              <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
+                <input
+                  type="text"
+                  value={newActivityName}
+                  onChange={(e) => setNewActivityName(e.target.value)}
+                  placeholder="Activity name"
+                  className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
+                />
+                <div className="flex gap-2">
+                  <select
+                    value={newActivityCategory}
+                    onChange={(e) => { setNewActivityCategory(e.target.value); setNewCategoryName('') }}
+                    className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 bg-white"
+                  >
+                    <option value="">Select category…</option>
+                    {allCategoryNames.map(c => <option key={c} value={c}>{c}</option>)}
+                    <option value="__new__">New category…</option>
+                  </select>
+                  {newActivityCategory === '__new__' && (
+                    <input
+                      type="text"
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      placeholder="Category name"
+                      className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
+                    />
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const name = newActivityName.trim()
+                      const category = newActivityCategory === '__new__' ? newCategoryName.trim() : newActivityCategory
+                      if (!name || !category) return
+                      addCustomActivity(name, category)
+                      setNewActivityName('')
+                      setNewActivityCategory('')
+                      setNewCategoryName('')
+                      setShowAddForm(false)
+                    }}
+                    className="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                  >
+                    Add
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowAddForm(false); setNewActivityName(''); setNewActivityCategory(''); setNewCategoryName('') }}
+                    className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowAddForm(v => !v)}
+              className="text-sm text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
+            >
+              {showAddForm ? '− Cancel' : '+ Add activity'}
+            </button>
           </div>
 
           <div className="mt-4">
