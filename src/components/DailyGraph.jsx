@@ -91,7 +91,7 @@ function DailyGraph() {
         </div>
       )}
       <div ref={scrollRef} className="overflow-x-auto">
-        <LineChart width={chartWidth} height={300} data={data} margin={{ left: -10 }}>
+        <LineChart width={chartWidth} height={300} data={data} margin={{ left: -10, top: 10 }}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis
             dataKey="ts"
