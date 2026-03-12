@@ -10,6 +10,7 @@ import FileManager from './components/FileManager'
 import StreakCard from './components/StreakCard'
 import AnalyticsView from './components/AnalyticsView'
 
+<<<<<<< HEAD
 function AuthWidget() {
   const { user, loading, signInWithGoogle, logout } = useAuth()
 
@@ -58,7 +59,31 @@ function AuthWidget() {
 }
 
 function AppContent() {
+=======
+import { signInWithPopup, signOut } from 'firebase/auth'
+import { auth, googleProvider } from './firebase/firebaseConfig'
+
+function App() {
+>>>>>>> 28a2981 (added firebase setup and google auth)
   const [activeTab, setActiveTab] = useState('dashboard')
+
+  const handleGoogleLogin = async () => {
+    try {
+      const result = await signInWithPopup(auth, googleProvider)
+      console.log('Signed in user:', result.user)
+    } catch (error) {
+      console.error('Google sign-in error:', error)
+    }
+  }
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth)
+      console.log('Signed out')
+    } catch (error) {
+      console.error('Logout error:', error)
+    }
+  }
 
   return (
     <HealthDataProvider>
@@ -122,6 +147,23 @@ function AppContent() {
               </button>
             </nav>
           </div>
+          {/* Google Login Buttons */}
+                    <div className="mb-4 flex gap-2">
+            <button
+              onClick={handleGoogleLogin}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg"
+            >
+              Sign in with Google
+            </button>
+
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg"
+            >
+              Log out
+            </button>
+          </div>
+{/* Google Login Buttons */}
 
           {activeTab === 'dashboard' && (
             <div className="space-y-6">
