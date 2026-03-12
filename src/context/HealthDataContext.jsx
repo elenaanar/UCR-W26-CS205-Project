@@ -1,24 +1,40 @@
 import { createContext, useContext, useState, useEffect, useRef } from 'react'
 import { loadData, saveData, saveFileHandleInfo, getFileHandleInfo, loadCustomActivities, saveCustomActivities } from '../utils/storage'
 import { createFile, openFile, writeFile, readFile } from '../utils/fileOperations'
-import { useAuth } from './AuthContext'
+import { useAuth, isNative } from './AuthContext'
 import {
   fetchUserMoodEntries, saveUserMoodEntry, deleteUserMoodEntry,
   fetchUserCustomActivities, saveUserCustomActivities, batchSaveUserMoodEntries,
+  fetchUserMoodEntriesREST, saveUserMoodEntryREST, deleteUserMoodEntryREST,
+  fetchUserCustomActivitiesREST, saveUserCustomActivitiesREST, batchSaveUserMoodEntriesREST,
 } from '../firebase/firestoreHelpers'
 
 const HealthDataContext = createContext()
 
 export function HealthDataProvider({ children }) {
-  const { user, firebaseUser } = useAuth()
+  const { user, firebaseUser, getNativeToken } = useAuth()
   const [moodEntries, setMoodEntries] = useState([])
   const [isLoaded, setIsLoaded] = useState(false)
   const [fileHandle, setFileHandle] = useState(null)
-  const [fileStatus, setFileStatus] = useState('none') // 'none', 'saving', 'saved', 'error'
+  const [fileStatus, setFileStatus] = useState('none')
   const [customActivities, setCustomActivities] = useState({ custom: [], deleted: [] })
   const fileHandleRef = useRef(null)
   const firebaseUserRef = useRef(firebaseUser)
+  const userRef = useRef(user)
   useEffect(() => { firebaseUserRef.current = firebaseUser }, [firebaseUser])
+  useEffect(() => { userRef.current = user }, [user])
+
+  // Returns { uid, token } for Firestore ops, or null if no auth.
+  // token is null when JS SDK auth is active (JS SDK handles auth internally).
+  // token is a Firebase ID string when using REST API fallback (native without JS SDK auth).
+  const getFirestoreAuth = async () => {
+    if (firebaseUser) return { uid: firebaseUser.uid, token: null }
+    if (isNative && user) {
+      const token = await getNativeToken()
+      if (token) return { uid: user.uid, token }
+    }
+    return null
+  }
 
   // Load from localStorage on startup (fast, synchronous)
   useEffect(() => {
@@ -28,14 +44,12 @@ export function HealthDataProvider({ children }) {
       setCustomActivities(loadCustomActivities())
       setIsLoaded(true)
 
-      // Try to set up file auto-save
       const handleInfo = getFileHandleInfo()
       if (handleInfo && 'showOpenFilePicker' in window) {
         const handle = await openFile()
         if (handle) {
           fileHandleRef.current = handle
           setFileHandle(handle)
-
           const fileData = await readFile(handle)
           if (fileData?.moodEntries) {
             const fileDate = fileData.lastSaved ? new Date(fileData.lastSaved) : null
@@ -65,12 +79,12 @@ export function HealthDataProvider({ children }) {
     initialize()
   }, [])
 
-  // When auth state changes after load: switch data source.
-  // Uses firebaseUser (JS Firebase SDK authed) for Firestore so auth.currentUser is guaranteed set.
+  // When auth state changes: switch data source.
   useEffect(() => {
     if (!isLoaded) return
     if (firebaseUser) {
-      console.log('[Data] firebaseUser signed in, uid:', firebaseUser.uid, 'fetching from Firestore...')
+      // JS SDK auth active — use Firestore JS SDK
+      console.log('[Data] firebaseUser set, fetching from Firestore JS SDK...')
       Promise.all([
         fetchUserMoodEntries(firebaseUser.uid),
         fetchUserCustomActivities(firebaseUser.uid),
@@ -79,15 +93,32 @@ export function HealthDataProvider({ children }) {
         setMoodEntries(entries)
         setCustomActivities(activities)
       }).catch(err => {
-        console.error('[Data] Firestore fetch failed:', err?.code, err?.message)
+        console.error('[Data] Firestore JS fetch failed:', err?.code, err?.message)
+      })
+    } else if (isNative && user) {
+      // iOS native auth only — use Firestore REST API with plugin token
+      console.log('[Data] native user set (no firebaseUser), fetching via REST API...')
+      getNativeToken().then(token => {
+        if (!token) { console.warn('[Data] no native token, skipping REST fetch'); return }
+        return Promise.all([
+          fetchUserMoodEntriesREST(user.uid, token),
+          fetchUserCustomActivitiesREST(user.uid, token),
+        ])
+      }).then(result => {
+        if (!result) return
+        const [entries, activities] = result
+        console.log('[Data] REST fetch succeeded, entries:', entries.length)
+        setMoodEntries(entries)
+        setCustomActivities(activities)
+      }).catch(err => {
+        console.error('[Data] REST fetch failed:', err?.message)
       })
     } else if (!user) {
-      // Fully logged out — fall back to localStorage
+      // Logged out
       const loaded = loadData()
       setMoodEntries(loaded.moodEntries)
       setCustomActivities(loadCustomActivities())
     }
-    // If user is set (plugin fallback) but firebaseUser is null, wait — onAuthStateChanged will fire
   }, [firebaseUser, user, isLoaded])
 
   // Auto-save to localStorage and file when entries change
@@ -148,30 +179,45 @@ export function HealthDataProvider({ children }) {
     return false
   }
 
-  const addMoodEntry = (entry) => {
+  const addMoodEntry = async (entry) => {
     setMoodEntries(prev => [...prev, entry])
-    if (firebaseUser) saveUserMoodEntry(firebaseUser.uid, entry).catch(console.error)
+    const fsAuth = await getFirestoreAuth()
+    if (!fsAuth) return
+    if (fsAuth.token) saveUserMoodEntryREST(fsAuth.uid, entry, fsAuth.token).catch(console.error)
+    else saveUserMoodEntry(fsAuth.uid, entry).catch(console.error)
   }
 
-  const deleteMoodEntry = (id) => {
+  const deleteMoodEntry = async (id) => {
     setMoodEntries(prev => prev.filter(e => e.id !== id))
-    if (firebaseUser) deleteUserMoodEntry(firebaseUser.uid, id).catch(console.error)
+    const fsAuth = await getFirestoreAuth()
+    if (!fsAuth) return
+    if (fsAuth.token) deleteUserMoodEntryREST(fsAuth.uid, id, fsAuth.token).catch(console.error)
+    else deleteUserMoodEntry(fsAuth.uid, id).catch(console.error)
   }
 
-  const updateMoodEntry = (id, updatedEntry) => {
+  const updateMoodEntry = async (id, updatedEntry) => {
     const entry = { ...updatedEntry, id }
     setMoodEntries(prev => prev.map(e => e.id === id ? entry : e))
-    if (firebaseUser) saveUserMoodEntry(firebaseUser.uid, entry).catch(console.error)
+    const fsAuth = await getFirestoreAuth()
+    if (!fsAuth) return
+    if (fsAuth.token) saveUserMoodEntryREST(fsAuth.uid, entry, fsAuth.token).catch(console.error)
+    else saveUserMoodEntry(fsAuth.uid, entry).catch(console.error)
   }
 
   // Auto-save custom activities to localStorage (and Firestore when logged in).
-  // Intentionally NOT depending on firebaseUser — using a ref instead so that
-  // auth state changes (login/logout) don't trigger a save with stale activity data.
+  // Uses refs for firebaseUser/user to avoid saving stale data on auth state changes.
   useEffect(() => {
     if (!isLoaded) return
     saveCustomActivities(customActivities)
     const fbUser = firebaseUserRef.current
-    if (fbUser) saveUserCustomActivities(fbUser.uid, customActivities).catch(console.error)
+    const currentUser = userRef.current
+    if (fbUser) {
+      saveUserCustomActivities(fbUser.uid, customActivities).catch(console.error)
+    } else if (isNative && currentUser) {
+      getNativeToken().then(token => {
+        if (token) saveUserCustomActivitiesREST(currentUser.uid, customActivities, token).catch(console.error)
+      })
+    }
   }, [customActivities, isLoaded])
 
   const addCustomActivity = (name, category) => {
@@ -197,14 +243,17 @@ export function HealthDataProvider({ children }) {
           a => (typeof a === 'string' ? a : a.name) !== name
         ),
       }))
-      if (firebaseUser) {
+      getFirestoreAuth().then(fsAuth => {
+        if (!fsAuth) return
         updated.forEach((entry, i) => {
           const hadActivity = (prev[i].activities || []).some(
             a => (typeof a === 'string' ? a : a.name) === name
           )
-          if (hadActivity) saveUserMoodEntry(firebaseUser.uid, entry).catch(console.error)
+          if (!hadActivity) return
+          if (fsAuth.token) saveUserMoodEntryREST(fsAuth.uid, entry, fsAuth.token).catch(console.error)
+          else saveUserMoodEntry(fsAuth.uid, entry).catch(console.error)
         })
-      }
+      })
       return updated
     })
   }
@@ -217,7 +266,7 @@ export function HealthDataProvider({ children }) {
     return JSON.stringify({ moodEntries, customActivities, exportedAt: new Date().toISOString() }, null, 2)
   }
 
-  const importData = (jsonString) => {
+  const importData = async (jsonString) => {
     try {
       const data = JSON.parse(jsonString)
       if (data.moodEntries && Array.isArray(data.moodEntries)) {
@@ -226,10 +275,14 @@ export function HealthDataProvider({ children }) {
           setCustomActivities(data.customActivities)
           saveCustomActivities(data.customActivities)
         }
-        if (firebaseUser) {
-          batchSaveUserMoodEntries(firebaseUser.uid, data.moodEntries).catch(console.error)
-          if (data.customActivities) {
-            saveUserCustomActivities(firebaseUser.uid, data.customActivities).catch(console.error)
+        const fsAuth = await getFirestoreAuth()
+        if (fsAuth) {
+          if (fsAuth.token) {
+            batchSaveUserMoodEntriesREST(fsAuth.uid, data.moodEntries, fsAuth.token).catch(console.error)
+            if (data.customActivities) saveUserCustomActivitiesREST(fsAuth.uid, data.customActivities, fsAuth.token).catch(console.error)
+          } else {
+            batchSaveUserMoodEntries(fsAuth.uid, data.moodEntries).catch(console.error)
+            if (data.customActivities) saveUserCustomActivities(fsAuth.uid, data.customActivities).catch(console.error)
           }
         }
         return true
