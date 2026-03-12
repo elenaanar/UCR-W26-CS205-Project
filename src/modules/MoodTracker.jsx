@@ -96,6 +96,7 @@ function MoodTracker() {
   const [pickerDate, setPickerDate] = useState('')
   const [pickerTime, setPickerTime] = useState('12:00')
   const [editingEntry, setEditingEntry] = useState(null)
+  const [expandedEntryId, setExpandedEntryId] = useState(null)
   const dateInputRef = useRef(null)
   const trackerRef = useRef(null)
 
@@ -230,9 +231,6 @@ function MoodTracker() {
     return d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })
   })()
 
-  const latestEntry = moodEntries.length > 0
-    ? [...moodEntries].sort((a, b) => b.id - a.id)[0]
-    : null
 
   return (
     <div ref={trackerRef} className="bg-white rounded-lg shadow-lg p-6">
@@ -459,28 +457,6 @@ function MoodTracker() {
         </button>
       </div>
 
-      {latestEntry && (
-        <div className="mb-6 p-4 bg-indigo-50 rounded-lg">
-          <p className="text-sm text-gray-600 mb-1">Last recorded mood:</p>
-          <p className="text-lg font-semibold text-indigo-700">
-            {latestEntry.mood} – {MOOD_LABELS[latestEntry.mood] || 'Mood'}
-          </p>
-          <p className="text-xs text-gray-500 mt-1">
-            {formatDate(latestEntry.date)} at {latestEntry.time}
-          </p>
-          {latestEntry.activities && latestEntry.activities.length > 0 && (
-            <p className="text-xs text-gray-500 mt-2">
-              Activities: {latestEntry.activities.map((a) => typeof a === 'string' ? a : a.name).join(', ')}
-            </p>
-          )}
-          {latestEntry.notes && (
-            <p className="text-xs text-gray-600 mt-2 italic">
-              Note: {latestEntry.notes.length > 100 ? latestEntry.notes.substring(0, 100) + '...' : latestEntry.notes}
-            </p>
-          )}
-        </div>
-      )}
-
       <div className="space-y-2 max-h-64 overflow-y-auto">
         {moodEntries.length === 0 ? (
           <p className="text-gray-500 text-center py-4">
@@ -489,23 +465,29 @@ function MoodTracker() {
         ) : (
           [...moodEntries]
             .sort((a, b) => b.id - a.id)
-            .map((entry) => (
+            .map((entry, index) => {
+              const isExpanded = expandedEntryId !== null ? expandedEntryId === entry.id : index === 0
+              return (
               <div
                 key={entry.id}
-                className="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                className={`rounded-lg overflow-hidden transition-colors ${isExpanded ? 'bg-indigo-50' : 'bg-gray-50 hover:bg-gray-100'}`}
               >
-                <div>
-                  <span className="font-medium text-gray-800">
-                    {entry.mood} – {MOOD_LABELS[entry.mood] || 'Mood'}
-                  </span>
-                  <span className="text-gray-500 text-sm ml-2">
-                    • {formatDate(entry.date)} at {entry.time}
-                  </span>
-                </div>
-                <div className="flex gap-1">
+                <div
+                  onClick={() => setExpandedEntryId(prev => (prev === entry.id || (prev === null && index === 0)) ? -1 : entry.id)}
+                  className="flex justify-between items-center p-3 cursor-pointer"
+                >
+                  <div>
+                    <span className="font-medium text-gray-800">
+                      {entry.mood} – {MOOD_LABELS[entry.mood] || 'Mood'}
+                    </span>
+                    <span className="text-gray-500 text-sm ml-2">
+                      • {formatDate(entry.date)} at {entry.time}
+                    </span>
+                  </div>
+                  <div className="flex gap-1 items-center">
                   <button
-                    onClick={() => startEditing(entry)}
-                    className="text-indigo-500 hover:text-indigo-700 p-1.5 rounded hover:bg-indigo-50 transition-colors"
+                    onClick={(e) => { e.stopPropagation(); startEditing(entry) }}
+                    className="text-indigo-500 hover:text-indigo-700 p-1.5 rounded hover:bg-indigo-100 transition-colors"
                     title="Edit this entry"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -514,8 +496,7 @@ function MoodTracker() {
                     </svg>
                   </button>
                   <button
-                    onClick={() => {
-                      if (window.confirm('Delete this mood entry?')) {
+                    onClick={(e) => { e.stopPropagation(); if (window.confirm('Delete this mood entry?')) {
                         deleteMoodEntry(entry.id)
                       }
                     }}
@@ -530,9 +511,27 @@ function MoodTracker() {
                       <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
                     </svg>
                   </button>
+                  </div>
                 </div>
+                {isExpanded && (
+                  <div className="px-3 pb-3 pt-1 bg-indigo-50 space-y-1">
+                    {entry.activities && entry.activities.length > 0 && (
+                      <p className="text-xs text-gray-500">
+                        Activities: {entry.activities.map((a) => typeof a === 'string' ? a : a.name).join(', ')}
+                      </p>
+                    )}
+                    {entry.notes && (
+                      <p className="text-xs text-gray-600 italic">
+                        Note: {entry.notes.length > 100 ? entry.notes.substring(0, 100) + '...' : entry.notes}
+                      </p>
+                    )}
+                    {!entry.activities?.length && !entry.notes && (
+                      <p className="text-xs text-gray-400 italic">No activities or notes logged.</p>
+                    )}
+                  </div>
+                )}
               </div>
-            ))
+            )})
         )}
       </div>
     </div>
