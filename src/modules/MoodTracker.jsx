@@ -73,8 +73,16 @@ const ACTIVITY_CATEGORIES = {
   ],
 }
 
+// Find which category an activity name belongs to (for backward-compat normalization)
+function findCategory(activityName) {
+  for (const [category, activities] of Object.entries(ACTIVITY_CATEGORIES)) {
+    if (activities.includes(activityName)) return category
+  }
+  return 'Other'
+}
+
 function MoodTracker() {
-  const { moodEntries, addMoodEntry, deleteMoodEntry } = useHealthData()
+  const { moodEntries, addMoodEntry, deleteMoodEntry, updateMoodEntry } = useHealthData()
   const [selectedMood, setSelectedMood] = useState(null)
   const [selectedActivities, setSelectedActivities] = useState([])
   const [notes, setNotes] = useState('')
@@ -82,7 +90,9 @@ function MoodTracker() {
   const [pastMode, setPastMode] = useState(null)
   const [pickerDate, setPickerDate] = useState('')
   const [pickerTime, setPickerTime] = useState('12:00')
+  const [editingEntry, setEditingEntry] = useState(null)
   const dateInputRef = useRef(null)
+  const trackerRef = useRef(null)
 
   const handleSelectMood = (mood) => {
     if (selectedMood === mood) {
@@ -94,21 +104,30 @@ function MoodTracker() {
     }
   }
 
-  const handleToggleActivity = (activity) => {
+  const handleToggleActivity = (activity, category) => {
     setSelectedActivities((prev) =>
-      prev.includes(activity)
-        ? prev.filter((item) => item !== activity)
-        : [...prev, activity]
+      prev.some((a) => a.name === activity)
+        ? prev.filter((a) => a.name !== activity)
+        : [...prev, { name: activity, category }]
     )
+  }
+
+  const resetForm = () => {
+    setEditingEntry(null)
+    setSelectedMood(null)
+    setSelectedActivities([])
+    setNotes('')
+    setPastMode(null)
+    setPickerDate('')
+    setPickerTime('12:00')
   }
 
   const handleSubmit = () => {
     if (!selectedMood) return
 
     const now = new Date()
-
-    const newEntry = {
-      id: Date.now(),
+    const entry = {
+      id: editingEntry ? editingEntry.id : Date.now(),
       mood: selectedMood,
       activities: selectedActivities,
       notes: notes.trim(),
@@ -117,12 +136,8 @@ function MoodTracker() {
       time: now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
     }
 
-    addMoodEntry(newEntry)
-    setSelectedMood(null)
-    setSelectedActivities([])
-    setNotes('')
-    setPastMode(null)
-    setPickerDate('')
+    editingEntry ? updateMoodEntry(editingEntry.id, entry) : addMoodEntry(entry)
+    resetForm()
   }
 
   const handleSubmitForDate = (dateObj) => {
@@ -136,8 +151,8 @@ function MoodTracker() {
     const h12 = hours % 12 || 12
     const timeStr = `${h12}:${String(minutes).padStart(2, '0')} ${ampm}`
 
-    const newEntry = {
-      id: Date.now(),
+    const entry = {
+      id: editingEntry ? editingEntry.id : Date.now(),
       mood: selectedMood,
       activities: selectedActivities,
       notes: notes.trim(),
@@ -146,16 +161,50 @@ function MoodTracker() {
       time: timeStr,
     }
 
-    addMoodEntry(newEntry)
-    setSelectedMood(null)
-    setSelectedActivities([])
-    setNotes('')
+    editingEntry ? updateMoodEntry(editingEntry.id, entry) : addMoodEntry(entry)
+    resetForm()
+  }
+
+  const resetPastMode = () => {
     setPastMode(null)
     setPickerDate('')
     setPickerTime('12:00')
   }
 
-  const resetPastMode = () => {
+  const startEditing = (entry) => {
+    setEditingEntry(entry)
+    setSelectedMood(entry.mood)
+    setNotes(entry.notes || '')
+    // Normalize activities (handle old string-array format)
+    setSelectedActivities(
+      (entry.activities || []).map(a =>
+        typeof a === 'string' ? { name: a, category: findCategory(a) } : a
+      )
+    )
+    // Parse stored date "M/D/YYYY" → "YYYY-MM-DD" for the date input
+    const [month, day, year] = entry.date.split('/').map(Number)
+    setPickerDate(
+      `${year.toString().padStart(4,'0')}-${month.toString().padStart(2,'0')}-${day.toString().padStart(2,'0')}`
+    )
+    // Parse stored time "H:MM AM/PM" → "HH:MM" for the time input
+    const timeMatch = entry.time.match(/(\d+):(\d+)\s*(AM|PM)/i)
+    if (timeMatch) {
+      let h = parseInt(timeMatch[1])
+      const m = parseInt(timeMatch[2])
+      const ampm = timeMatch[3].toUpperCase()
+      if (ampm === 'PM' && h !== 12) h += 12
+      if (ampm === 'AM' && h === 12) h = 0
+      setPickerTime(`${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`)
+    }
+    setPastMode('picker')
+    trackerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const cancelEditing = () => {
+    setEditingEntry(null)
+    setSelectedMood(null)
+    setSelectedActivities([])
+    setNotes('')
     setPastMode(null)
     setPickerDate('')
     setPickerTime('12:00')
@@ -181,10 +230,25 @@ function MoodTracker() {
     : null
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6">
+    <div ref={trackerRef} className="bg-white rounded-lg shadow-lg p-6">
       <h2 className="text-2xl font-semibold text-gray-800 mb-4">
         Mood Tracker
       </h2>
+
+      {/* Edit mode banner */}
+      {editingEntry && (
+        <div className="flex items-center justify-between mb-4 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+          <span className="text-sm text-amber-700 font-medium">
+            Editing entry from {editingEntry.date}
+          </span>
+          <button
+            onClick={cancelEditing}
+            className="text-sm text-amber-600 hover:text-amber-800 font-medium underline"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
       <p className="text-gray-600 mb-4">
         Select how you&apos;re feeling and then submit. Date and time are recorded automatically.
       </p>
@@ -241,13 +305,13 @@ function MoodTracker() {
 
                 <div className="flex flex-wrap gap-2">
                   {activities.map((activity) => {
-                    const isSelected = selectedActivities.includes(activity)
+                    const isSelected = selectedActivities.some((a) => a.name === activity)
 
                     return (
                       <button
                         key={activity}
                         type="button"
-                        onClick={() => handleToggleActivity(activity)}
+                        onClick={() => handleToggleActivity(activity, category)}
                         className={`px-3 py-2 rounded-full text-sm font-medium border transition-colors ${isSelected
                           ? 'bg-indigo-600 text-white border-indigo-600'
                           : 'bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100'
@@ -270,7 +334,7 @@ function MoodTracker() {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Write a journal entry or note about how you're feeling..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500 focus:border-transparent resize-none"
               rows="3"
             />
           </div>
@@ -374,7 +438,13 @@ function MoodTracker() {
               : 'bg-gray-200 text-gray-500 cursor-not-allowed'
           }`}
         >
-          {pastMode === 'yesterday'
+          {editingEntry
+            ? pastMode === 'picker' && pickerDateFormatted
+              ? `Update entry for ${pickerDateFormatted}`
+              : pastMode === 'menu'
+              ? 'Select a day above'
+              : 'Update entry'
+            : pastMode === 'yesterday'
             ? 'Confirm for yesterday'
             : pastMode === 'picker' && pickerDateFormatted
             ? `Confirm for ${pickerDateFormatted}`
@@ -395,7 +465,7 @@ function MoodTracker() {
           </p>
           {latestEntry.activities && latestEntry.activities.length > 0 && (
             <p className="text-xs text-gray-500 mt-2">
-              Activities: {latestEntry.activities.join(', ')}
+              Activities: {latestEntry.activities.map((a) => typeof a === 'string' ? a : a.name).join(', ')}
             </p>
           )}
           {latestEntry.notes && (
@@ -427,17 +497,35 @@ function MoodTracker() {
                     • {entry.date} at {entry.time}
                   </span>
                 </div>
-                <button
-                  onClick={() => {
-                    if (window.confirm('Delete this mood entry?')) {
-                      deleteMoodEntry(entry.id)
-                    }
-                  }}
-                  className="text-red-500 hover:text-red-700 font-medium text-sm px-2 py-1 rounded hover:bg-red-50 transition-colors"
-                  title="Delete this entry"
-                >
-                  Delete
-                </button>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => startEditing(entry)}
+                    className="text-indigo-500 hover:text-indigo-700 p-1.5 rounded hover:bg-indigo-50 transition-colors"
+                    title="Edit this entry"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (window.confirm('Delete this mood entry?')) {
+                        deleteMoodEntry(entry.id)
+                      }
+                    }}
+                    className="text-red-500 hover:text-red-700 p-1.5 rounded hover:bg-red-50 transition-colors"
+                    title="Delete this entry"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6"/>
+                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                      <path d="M10 11v6"/>
+                      <path d="M14 11v6"/>
+                      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                    </svg>
+                  </button>
+                </div>
               </div>
             ))
         )}

@@ -123,6 +123,10 @@ export function HealthDataProvider({ children }) {
     setMoodEntries(moodEntries.filter(entry => entry.id !== id))
   }
 
+  const updateMoodEntry = (id, updatedEntry) => {
+    setMoodEntries(moodEntries.map(e => e.id === id ? { ...updatedEntry, id } : e))
+  }
+
   const setAllData = (moodEntries) => {
     setMoodEntries(moodEntries)
   }
@@ -155,6 +159,7 @@ export function HealthDataProvider({ children }) {
         moodEntries,
         addMoodEntry,
         deleteMoodEntry,
+        updateMoodEntry,
         exportData,
         importData,
         setAllData,
