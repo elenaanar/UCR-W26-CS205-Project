@@ -52,6 +52,7 @@ export function HealthDataProvider({ children }) {
           saveFileHandleInfo(handle)
           await writeFile(handle, {
             moodEntries: loaded.moodEntries,
+            customActivities: loadCustomActivities(),
             lastSaved: new Date().toISOString()
           })
         }
@@ -76,6 +77,7 @@ export function HealthDataProvider({ children }) {
     setFileStatus('saving')
     const success = await writeFile(handle, {
       moodEntries,
+      customActivities,
       lastSaved: new Date().toISOString()
     })
     
@@ -111,6 +113,10 @@ export function HealthDataProvider({ children }) {
       if (data?.moodEntries) {
         setMoodEntries(data.moodEntries)
         saveData(data.moodEntries)
+        if (data.customActivities) {
+          setCustomActivities(data.customActivities)
+          saveCustomActivities(data.customActivities)
+        }
         return true
       }
     }
@@ -129,10 +135,12 @@ export function HealthDataProvider({ children }) {
     setMoodEntries(moodEntries.map(e => e.id === id ? { ...updatedEntry, id } : e))
   }
 
-  // Auto-save custom activities whenever they change
+  // Auto-save custom activities whenever they change (guard with isLoaded to avoid wiping on mount)
   useEffect(() => {
-    saveCustomActivities(customActivities)
-  }, [customActivities])
+    if (isLoaded) {
+      saveCustomActivities(customActivities)
+    }
+  }, [customActivities, isLoaded])
 
   const addCustomActivity = (name, category) => {
     setCustomActivities(prev => ({
@@ -163,6 +171,7 @@ export function HealthDataProvider({ children }) {
   const exportData = () => {
     const data = {
       moodEntries,
+      customActivities,
       exportedAt: new Date().toISOString(),
     }
     return JSON.stringify(data, null, 2)
@@ -173,6 +182,10 @@ export function HealthDataProvider({ children }) {
       const data = JSON.parse(jsonString)
       if (data.moodEntries && Array.isArray(data.moodEntries)) {
         setAllData(data.moodEntries)
+        if (data.customActivities) {
+          setCustomActivities(data.customActivities)
+          saveCustomActivities(data.customActivities)
+        }
         return true
       }
       return false
