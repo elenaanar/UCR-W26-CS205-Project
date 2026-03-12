@@ -77,8 +77,8 @@ function App() {
                   <WeeklyGraph />
                 </div>
                 <div className="flex flex-col gap-6 lg:w-1/2">
-                  <DailyGraph />
                   <StreakCard />
+                  <DailyGraph />
                 </div>
               </div>
             </div>
