@@ -17,6 +17,8 @@ export function HealthDataProvider({ children }) {
   const [fileStatus, setFileStatus] = useState('none') // 'none', 'saving', 'saved', 'error'
   const [customActivities, setCustomActivities] = useState({ custom: [], deleted: [] })
   const fileHandleRef = useRef(null)
+  const firebaseUserRef = useRef(firebaseUser)
+  useEffect(() => { firebaseUserRef.current = firebaseUser }, [firebaseUser])
 
   // Load from localStorage on startup (fast, synchronous)
   useEffect(() => {
@@ -162,12 +164,15 @@ export function HealthDataProvider({ children }) {
     if (firebaseUser) saveUserMoodEntry(firebaseUser.uid, entry).catch(console.error)
   }
 
-  // Auto-save custom activities to localStorage (and Firestore when logged in)
+  // Auto-save custom activities to localStorage (and Firestore when logged in).
+  // Intentionally NOT depending on firebaseUser — using a ref instead so that
+  // auth state changes (login/logout) don't trigger a save with stale activity data.
   useEffect(() => {
     if (!isLoaded) return
     saveCustomActivities(customActivities)
-    if (firebaseUser) saveUserCustomActivities(firebaseUser.uid, customActivities).catch(console.error)
-  }, [customActivities, isLoaded, firebaseUser])
+    const fbUser = firebaseUserRef.current
+    if (fbUser) saveUserCustomActivities(fbUser.uid, customActivities).catch(console.error)
+  }, [customActivities, isLoaded])
 
   const addCustomActivity = (name, category) => {
     setCustomActivities(prev => ({
