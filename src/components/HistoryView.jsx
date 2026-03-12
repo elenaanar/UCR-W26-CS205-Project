@@ -1,6 +1,11 @@
 import { useMemo, useState } from 'react'
 import { useHealthData } from '../context/HealthDataContext'
 
+const formatDate = (dateStr) => {
+  const [month, day, year] = dateStr.split('/').map(Number)
+  return new Date(year, month - 1, day).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+}
+
 const MOOD_LABELS = {
   1: 'Very Low',
   2: 'Low',
@@ -49,7 +54,7 @@ function HistoryView() {
             .sort((a, b) => new Date(b[0]) - new Date(a[0]))
             .map(([date, entries]) => (
               <div key={date} className="border-b border-gray-200 pb-4 last:border-b-0">
-                <h3 className="text-lg font-semibold text-gray-700 mb-3">{date}</h3>
+                <h3 className="text-lg font-semibold text-gray-700 mb-3">{formatDate(date)}</h3>
                 <div className="space-y-2">
                   {entries.map((entry) => (
                     <div key={entry.id}>

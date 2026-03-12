@@ -2,6 +2,11 @@ import { useState, useRef } from 'react'
 import { useHealthData } from '../context/HealthDataContext'
 import { getTodayFormatted } from '../utils/helpers'
 
+const formatDate = (dateStr) => {
+  const [month, day, year] = dateStr.split('/').map(Number)
+  return new Date(year, month - 1, day).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+}
+
 const MOOD_LABELS = {
   1: 'Very Low',
   2: 'Low',
@@ -239,7 +244,7 @@ function MoodTracker() {
       {editingEntry && (
         <div className="flex items-center justify-between mb-4 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
           <span className="text-sm text-amber-700 font-medium">
-            Editing entry from {editingEntry.date}
+            Editing entry from {formatDate(editingEntry.date)}
           </span>
           <button
             onClick={cancelEditing}
@@ -461,7 +466,7 @@ function MoodTracker() {
             {latestEntry.mood} – {MOOD_LABELS[latestEntry.mood] || 'Mood'}
           </p>
           <p className="text-xs text-gray-500 mt-1">
-            {latestEntry.date} at {latestEntry.time}
+            {formatDate(latestEntry.date)} at {latestEntry.time}
           </p>
           {latestEntry.activities && latestEntry.activities.length > 0 && (
             <p className="text-xs text-gray-500 mt-2">
@@ -494,7 +499,7 @@ function MoodTracker() {
                     {entry.mood} – {MOOD_LABELS[entry.mood] || 'Mood'}
                   </span>
                   <span className="text-gray-500 text-sm ml-2">
-                    • {entry.date} at {entry.time}
+                    • {formatDate(entry.date)} at {entry.time}
                   </span>
                 </div>
                 <div className="flex gap-1">
