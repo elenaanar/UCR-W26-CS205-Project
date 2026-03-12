@@ -1,17 +1,10 @@
 import { useMemo, useRef, useEffect, useState } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine } from 'recharts'
 import { useHealthData } from '../context/HealthDataContext'
+import { BUILT_IN_ACTIVITY_CATEGORIES } from '../utils/activityCategories'
 
 const DAY_MS = 86400000
 const PX_PER_DAY = 200
-
-const ACTIVITY_CATEGORIES = {
-  Social:           ['Friends', 'Family', 'Partner', 'Me Time', 'Classmates', 'Social Event'],
-  Hobbies:          ['Reading', 'Music', 'Writing', 'Gaming', 'Movies & TV', 'Art / Creative', 'Outdoors', 'Walking', 'Exercise / Gym', 'Sports'],
-  Responsibilities: ['Work', 'Studying', 'Homework', 'Class', 'Shopping', 'Errands', 'Cleaning', 'Laundry', 'Cooking', 'Appointment'],
-  Wellness:         ['Good Sleep', 'Poor Sleep', 'Tired', 'Sick', 'Self Care', 'Stressed', 'Hydrated', 'Caffeine'],
-  Weather:          ['Sunny', 'Cloudy', 'Rainy', 'Windy', 'Stormy', 'Foggy', 'Hot', 'Cold'],
-}
 
 const getActivityName = (a) => typeof a === 'string' ? a : a.name
 
@@ -24,7 +17,22 @@ function CustomDot({ cx, cy, payload, selectedActivity }) {
 }
 
 function AnalyticsView() {
-  const { moodEntries } = useHealthData()
+  const { moodEntries, customActivities } = useHealthData()
+
+  const allCategories = useMemo(() => {
+    const merged = {}
+    Object.entries(BUILT_IN_ACTIVITY_CATEGORIES).forEach(([cat, acts]) => { merged[cat] = [...acts] })
+    customActivities.custom.forEach(({ name, category }) => {
+      if (!merged[category]) merged[category] = []
+      if (!merged[category].includes(name)) merged[category].push(name)
+    })
+    const deletedSet = new Set(customActivities.deleted)
+    return Object.fromEntries(
+      Object.entries(merged)
+        .map(([cat, acts]) => [cat, acts.filter(a => !deletedSet.has(a))])
+        .filter(([, acts]) => acts.length > 0)
+    )
+  }, [customActivities])
   const scrollRef = useRef(null)
   const [selectedActivity, setSelectedActivity] = useState(null)
 
@@ -177,7 +185,7 @@ function AnalyticsView() {
       <div className="bg-white rounded-lg shadow-lg p-6">
         <h3 className="text-lg font-semibold text-gray-800 mb-4">Select an Activity</h3>
         <div className="space-y-4">
-          {Object.entries(ACTIVITY_CATEGORIES).map(([category, activities]) => {
+          {Object.entries(allCategories).map(([category, activities]) => {
             const sorted = [...activities].sort((a, b) => (activityCounts[b] || 0) - (activityCounts[a] || 0))
             return (
               <div key={category}>
